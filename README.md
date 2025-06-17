@@ -20,4 +20,9 @@ with PostgreSQL.
 Once the containers are running, check the container logs. The server prints the
 URL where the app is available. In most setups this is
 `http://localhost:3000`, but in environments like Codespaces or Gitpod the log
-will show the full forwarded URL.
+will show the full forwarded URL. Look for a line similar to:
+
+```
+Server running at https://3000-your-space-url
+Open https://3000-your-space-url in your browser.
+```

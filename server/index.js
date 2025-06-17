@@ -76,4 +76,5 @@ app.listen(port, () => {
     url = `https://${port}-${host}`;
   }
   console.log(`Server running at ${url}`);
+  console.log(`Open ${url} in your browser.`);
 });
