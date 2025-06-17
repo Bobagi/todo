@@ -13,14 +13,26 @@ const pool = new Pool({
   password: process.env.POSTGRES_PASSWORD || 'todo',
 });
 
-async function init() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL
-  )`);
+async function init(retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL
+      )`);
+      return;
+    } catch (err) {
+      console.error('Database not ready, retrying...', err.message);
+      await new Promise(res => setTimeout(res, 3000));
+    }
+  }
+  throw new Error('Could not connect to database');
 }
 
-init();
+init().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
 
 app.use(cors());
 app.use(express.json());
