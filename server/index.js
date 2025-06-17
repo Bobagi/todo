@@ -16,9 +16,10 @@ const pool = new Pool({
 async function init(retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
-      await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
+  await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL
+        title TEXT NOT NULL,
+        done BOOLEAN DEFAULT FALSE
       )`);
       return;
     } catch (err) {
@@ -50,10 +51,30 @@ app.post('/api/tasks', async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
+app.put('/api/tasks/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, done } = req.body;
+  const { rows } = await pool.query(
+    'UPDATE tasks SET title=COALESCE($1,title), done=COALESCE($2,done) WHERE id=$3 RETURNING *',
+    [title, done, id]
+  );
+  res.json(rows[0]);
+});
+
 app.delete('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
   await pool.query('DELETE FROM tasks WHERE id=$1', [id]);
   res.status(204).end();
 });
 
-app.listen(port, () => console.log(`Server running on port ${port}`));
+app.listen(port, () => {
+  let url = `http://localhost:${port}`;
+  if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN) {
+    url = `https://${port}-${process.env.CODESPACE_NAME}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
+  } else if (process.env.GITPOD_WORKSPACE_URL) {
+    const host = process.env.GITPOD_WORKSPACE_URL.replace(/^https?:\/\//, '');
+    url = `https://${port}-${host}`;
+  }
+  console.log(`Server running at ${url}`);
+  console.log(`Open ${url} in your browser.`);
+});

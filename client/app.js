@@ -27,6 +27,15 @@ function App() {
     fetchTasks();
   };
 
+  const toggleDone = async (task) => {
+    await fetch('/api/tasks/' + task.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done: !task.done })
+    });
+    fetchTasks();
+  };
+
   return e('div', null,
     e('h1', null, 'Todo List'),
     e('input', {
@@ -38,7 +47,15 @@ function App() {
     e('ul', null,
       tasks.map(task =>
         e('li', { key: task.id },
-          task.title,
+          e('label', null,
+            e('input', {
+              type: 'checkbox',
+              checked: task.done,
+              onChange: () => toggleDone(task)
+            }),
+            ' ',
+            task.title
+          ),
           ' ',
           e('button', { onClick: () => deleteTask(task.id) }, 'x')
         )
