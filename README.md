@@ -17,5 +17,7 @@ docker compose up --build
 This command builds the images and launches the web server container together
 with PostgreSQL.
 
-Once the containers are running, open `http://localhost:3000` in your browser to
-access the to-do list interface.
+Once the containers are running, check the container logs. The server prints the
+URL where the app is available. In most setups this is
+`http://localhost:3000`, but in environments like Codespaces or Gitpod the log
+will show the full forwarded URL.

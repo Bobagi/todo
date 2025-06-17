@@ -68,6 +68,12 @@ app.delete('/api/tasks/:id', async (req, res) => {
 });
 
 app.listen(port, () => {
-  const url = `http://localhost:${port}`;
+  let url = `http://localhost:${port}`;
+  if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN) {
+    url = `https://${port}-${process.env.CODESPACE_NAME}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
+  } else if (process.env.GITPOD_WORKSPACE_URL) {
+    const host = process.env.GITPOD_WORKSPACE_URL.replace(/^https?:\/\//, '');
+    url = `https://${port}-${host}`;
+  }
   console.log(`Server running at ${url}`);
 });
