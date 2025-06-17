@@ -4,6 +4,10 @@ This project uses Docker to build and run a Node.js backend and React frontend.
 Both services are defined in `docker-compose.yml` along with a PostgreSQL
 database.
 
+The app stores tasks in a PostgreSQL database and exposes a small REST API.
+The React frontend is served as a Progressive Web App so it can be installed on
+desktop or mobile devices.
+
 To start the environment run:
 
 ```sh
