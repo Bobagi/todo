@@ -67,4 +67,7 @@ app.delete('/api/tasks/:id', async (req, res) => {
   res.status(204).end();
 });
 
-app.listen(port, () => console.log(`Server running on port ${port}`));
+app.listen(port, () => {
+  const url = `http://localhost:${port}`;
+  console.log(`Server running at ${url}`);
+});

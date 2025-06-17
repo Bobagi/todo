@@ -16,3 +16,6 @@ docker compose up --build
 
 This command builds the images and launches the web server container together
 with PostgreSQL.
+
+Once the containers are running, open `http://localhost:3000` in your browser to
+access the to-do list interface.
