@@ -39,10 +39,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
 app.get('/api/tasks', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM tasks ORDER BY id DESC');
   res.json(rows);
@@ -69,6 +65,11 @@ app.delete('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
   await pool.query('DELETE FROM tasks WHERE id=$1', [id]);
   res.status(204).end();
+});
+
+// Serve index.html for any other GET request so the PWA works with client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(port, () => {
