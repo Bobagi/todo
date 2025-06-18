@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3051;
+const port = process.env.PORT || 3000;
 
 const pool = new Pool({
   user: process.env.POSTGRES_USER || 'todo',
@@ -24,7 +24,7 @@ async function init(retries = 5) {
       return;
     } catch (err) {
       console.error('Database not ready, retrying...', err.message);
-      await new Promise(res => setTimeout(res, 3051));
+      await new Promise(res => setTimeout(res, 3000));
     }
   }
   throw new Error('Could not connect to database');
