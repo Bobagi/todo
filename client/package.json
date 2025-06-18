@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "mkdir -p build && cp index.html app.js manifest.json service-worker.js build/"
+    "build": "mkdir -p build && cp public/* build/ && cp app.js build/"
   }
 }
