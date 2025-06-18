@@ -1,0 +1,8 @@
+{
+  "name": "todo-client",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p build && cp index.html app.js manifest.json service-worker.js build/"
+  }
+}
