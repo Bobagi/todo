@@ -26,3 +26,8 @@ will show the full forwarded URL. Look for a line similar to:
 Server running at https://3000-your-space-url
 Open https://3000-your-space-url in your browser.
 ```
+
+The app registers a service worker and includes a manifest so it can be
+installed as a PWA. Browsers will only offer the install option when the page is
+served over HTTPS (or on `localhost`). Make sure to enable HTTPS on your VPS so
+the "Install app" button appears when you open the site.
