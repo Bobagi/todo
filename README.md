@@ -10,6 +10,8 @@ desktop or mobile devices.
 
 Copy `.env` to configure the database credentials and the external port used by
 the web container. Default values are provided but can be changed as needed.
+The server loads this file automatically, so running `node server/index.js`
+outside Docker works the same as using `docker compose`.
 
 To start the environment run:
 
