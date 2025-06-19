@@ -2,7 +2,7 @@ const e = React.createElement;
 
 function App() {
   const [tasks, setTasks] = React.useState([]);
-  const [title, setTitle] = React.useState([]);
+  const [title, setTitle] = React.useState("");
 
   const fetchTasks = async () => {
     const res = await fetch("/api/tasks");
@@ -42,14 +42,12 @@ function App() {
   return e(
     "div",
     null,
+
+    // Header
     e(
       "div",
       { style: { display: "flex", alignItems: "center", gap: "0.75rem" } },
-      e("img", {
-        src: "icon.png",
-        alt: "Logo",
-        style: { height: "1.8em" },
-      }),
+      e("img", { src: "icon.png", alt: "Logo", style: { height: "1.8em" } }),
       e("h1", { style: { margin: 0 } }, "To do"),
       !window.matchMedia("(display-mode: standalone)").matches &&
         e(
@@ -58,6 +56,8 @@ function App() {
           "Install app"
         )
     ),
+
+    // Slogan
     e(
       "div",
       {
@@ -66,30 +66,21 @@ function App() {
           fontSize: "0.9em",
           marginTop: "0.25rem",
           marginBottom: "0.75rem",
-          justifySelf: "center",
         },
       },
       "Organize. Simplify. Dominate."
     ),
+
+    // Footer: input + Add button (CSS .footer fixa só no mobile)
     e(
       "div",
-      {
-        style: {
-          display: "flex",
-          gap: "0.5rem",
-          width: "100%",
-          maxWidth: "400px",
-          marginBottom: "1rem",
-        },
-      },
+      { className: "footer" },
       e("input", {
         value: title,
         onChange: (e) => setTitle(e.target.value),
         placeholder: "New task",
         style: {
           flexGrow: 1,
-          flexShrink: 1,
-          width: "1%", // força a encolher
           boxSizing: "border-box",
           minWidth: 0,
         },
@@ -99,13 +90,15 @@ function App() {
         {
           onClick: addTask,
           style: {
-            whiteSpace: "nowrap", // impede quebra de texto no botão
-            flexShrink: 0, // impede botão de encolher
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           },
         },
         "Add"
       )
     ),
+
+    // Task list (continues abaixo do footer in desktop; on mobile footer is fixed)
     e(
       "ul",
       null,
@@ -134,6 +127,7 @@ function App() {
 
 ReactDOM.render(e(App), document.getElementById("root"));
 
+// PWA install button logic
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 

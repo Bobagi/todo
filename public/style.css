@@ -71,3 +71,27 @@ li input[type="checkbox"] {
 input[type="checkbox"] {
   accent-color: #f1c40f;
 }
+
+/* footer padrão (desktop/tablet) */
+.footer {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 400px;
+  margin: 1rem auto;
+  box-sizing: border-box;
+}
+
+/* mobile: fixa no rodapé */
+@media (max-width: 768px) {
+  .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.75rem;
+    background-color: #0d0d0d;
+    border-top: 1px solid #333;
+    margin: 0;
+  }
+}
