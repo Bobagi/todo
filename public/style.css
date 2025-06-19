@@ -68,11 +68,6 @@ li input[type="checkbox"] {
   margin-right: 0.5rem;
 }
 
-/* Install button */
-#install-btn {
-  margin-top: 2rem;
-}
-
 input[type="checkbox"] {
   accent-color: #f1c40f;
 }

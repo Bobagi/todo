@@ -42,7 +42,35 @@ function App() {
   return e(
     "div",
     null,
-    e("h1", null, "Todo List"),
+    e(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: "0.75rem" } },
+      e("img", {
+        src: "icon.png",
+        alt: "Logo",
+        style: { height: "1.8em" },
+      }),
+      e("h1", { style: { margin: 0 } }, "TaskFlow"),
+      !window.matchMedia("(display-mode: standalone)").matches &&
+        e(
+          "button",
+          { id: "install-btn", style: { marginLeft: "auto" } },
+          "Install app"
+        )
+    ),
+    e(
+      "div",
+      {
+        style: {
+          color: "#888",
+          fontSize: "0.9em",
+          marginTop: "0.25rem",
+          marginBottom: "0.75rem",
+          justifySelf: "center",
+        },
+      },
+      "Organize. Simplify. Dominate."
+    ),
     e("input", {
       value: title,
       onChange: (e) => setTitle(e.target.value),
@@ -80,14 +108,13 @@ ReactDOM.render(e(App), document.getElementById("root"));
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 
-// Esconde o botão se já está em modo standalone
 if (window.matchMedia("(display-mode: standalone)").matches) {
   installBtn.style.display = "none";
 }
 
 window.addEventListener("beforeinstallprompt", (e) => {
   deferredPrompt = e;
-  installBtn.style.display = "inline-block"; // Garante que o botão apareça se permitido
+  installBtn.style.display = "inline-block";
 });
 
 window.addEventListener("appinstalled", () => {
