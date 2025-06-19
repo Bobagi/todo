@@ -3,9 +3,9 @@
   "short_name": "Todo",
   "start_url": "/?source=pwa",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#000000",
   "description": "Simple todo PWA",
-  "theme_color": "#ffffff",
+  "theme_color": "#FFEB3B",
   "icons": [
     {
       "src": "/icon.png",
