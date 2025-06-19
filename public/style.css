@@ -1,0 +1,78 @@
+body {
+  background-color: #0d0d0d;
+  color: #f1c40f;
+  font-family: "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1 {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
+
+/* Input & Add button */
+input {
+  padding: 0.5rem 1rem;
+  border: 2px solid #f1c40f;
+  border-radius: 4px;
+  background: transparent;
+  color: #f1c40f;
+  margin-right: 0.5rem;
+  font-size: 1rem;
+}
+
+input::placeholder {
+  color: #f1c40f88;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background-color: #f1c40f;
+  color: #0d0d0d;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+button:hover {
+  background-color: #ffd700;
+}
+
+/* Task list */
+ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+li {
+  background-color: #1a1a1a;
+  border: 1px solid #f1c40f22;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 4px;
+}
+
+li input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+/* Install button */
+#install-btn {
+  margin-top: 2rem;
+}
+
+input[type="checkbox"] {
+  accent-color: #f1c40f;
+}

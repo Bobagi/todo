@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const app = express();
 const port = 3000;
+const port_web_dev = process.env.WEB_PORT || 3000;
 // const port = process.env.WEB_PORT || 3000;
 
 const pool = new Pool({
@@ -78,6 +79,7 @@ app.get("/*", (req, res) => {
 
 app.listen(port, () => {
   let url = `http://localhost:${port}`;
+  let port_web_dev_url = `http://localhost:${port_web_dev}`;
   if (
     process.env.CODESPACE_NAME &&
     process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN
@@ -88,5 +90,5 @@ app.listen(port, () => {
     url = `https://${port}-${host}`;
   }
   console.log(`Server running at ${url}`);
-  console.log(`Open ${url} in your browser.`);
+  console.log(`Open ${port_web_dev_url} in your browser.`);
 });
