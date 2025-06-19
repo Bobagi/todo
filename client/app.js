@@ -70,7 +70,7 @@ let deferredPrompt;
 const installBtn = document.getElementById('install-btn');
 
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
+  // e.preventDefault();
   deferredPrompt = e;
 });
 
