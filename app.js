@@ -75,6 +75,7 @@ function App() {
       value: title,
       onChange: (e) => setTitle(e.target.value),
       placeholder: "New task",
+      style: { flex: 1, minWidth: 0 },
     }),
     e("button", { onClick: addTask }, "Add"),
     e(
