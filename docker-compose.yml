@@ -2,20 +2,22 @@ services:
   web:
     build: .
     ports:
-      - "3051:3000"
+      - "${WEB_PORT:-3051}:3000"
+    environment:
+      WEB_PORT: ${WEB_PORT:-3051}
     depends_on:
       db:
         condition: service_healthy
   db:
     image: postgres:14
     environment:
-      POSTGRES_USER: todo
-      POSTGRES_PASSWORD: todo
-      POSTGRES_DB: todo
+      POSTGRES_USER: ${POSTGRES_USER:-todo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo}
+      POSTGRES_DB: ${POSTGRES_DB:-todo}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U todo -d todo"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo} -d ${POSTGRES_DB:-todo}"]
       interval: 5s
       timeout: 5s
       retries: 5

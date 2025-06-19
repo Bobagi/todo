@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const externalPort = process.env.WEB_PORT || port;
 
 const pool = new Pool({
   user: process.env.POSTGRES_USER || 'todo',
@@ -73,12 +74,12 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  let url = `http://localhost:${port}`;
+  let url = `http://localhost:${externalPort}`;
   if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN) {
-    url = `https://${port}-${process.env.CODESPACE_NAME}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
+    url = `https://${externalPort}-${process.env.CODESPACE_NAME}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
   } else if (process.env.GITPOD_WORKSPACE_URL) {
     const host = process.env.GITPOD_WORKSPACE_URL.replace(/^https?:\/\//, '');
-    url = `https://${port}-${host}`;
+    url = `https://${externalPort}-${host}`;
   }
   console.log(`Server running at ${url}`);
   console.log(`Open ${url} in your browser.`);
