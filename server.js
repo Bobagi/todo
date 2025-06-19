@@ -71,8 +71,7 @@ app.delete("/api/tasks/:id", async (req, res) => {
   res.status(204).end();
 });
 
-// Serve index.html for any other GET request so the PWA works with client-side routing
-app.get("*", (req, res) => {
+app.get("/*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
