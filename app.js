@@ -50,7 +50,7 @@ function App() {
         alt: "Logo",
         style: { height: "1.8em" },
       }),
-      e("h1", { style: { margin: 0 } }, "TaskFlow"),
+      e("h1", { style: { margin: 0 } }, "To do"),
       !window.matchMedia("(display-mode: standalone)").matches &&
         e(
           "button",
@@ -71,13 +71,41 @@ function App() {
       },
       "Organize. Simplify. Dominate."
     ),
-    e("input", {
-      value: title,
-      onChange: (e) => setTitle(e.target.value),
-      placeholder: "New task",
-      style: { flex: 1, minWidth: 0 },
-    }),
-    e("button", { onClick: addTask }, "Add"),
+    e(
+      "div",
+      {
+        style: {
+          display: "flex",
+          gap: "0.5rem",
+          width: "100%",
+          maxWidth: "400px",
+          marginBottom: "1rem",
+        },
+      },
+      e("input", {
+        value: title,
+        onChange: (e) => setTitle(e.target.value),
+        placeholder: "New task",
+        style: {
+          flexGrow: 1,
+          flexShrink: 1,
+          width: "1%", // força a encolher
+          boxSizing: "border-box",
+          minWidth: 0,
+        },
+      }),
+      e(
+        "button",
+        {
+          onClick: addTask,
+          style: {
+            whiteSpace: "nowrap", // impede quebra de texto no botão
+            flexShrink: 0, // impede botão de encolher
+          },
+        },
+        "Add"
+      )
+    ),
     e(
       "ul",
       null,
