@@ -4,7 +4,8 @@ services:
     ports:
       - "3051:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
   db:
     image: postgres:14
     environment:
@@ -13,5 +14,10 @@ services:
       POSTGRES_DB: todo
     volumes:
       - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo -d todo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 volumes:
   db-data:
