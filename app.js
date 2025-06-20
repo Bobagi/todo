@@ -103,7 +103,7 @@ function App() {
           title: "Add task",
           style: { fontSize: "1.25em", padding: "0.4em" },
         },
-        e("i", { className: "ph ph-plus" })
+        e("i", { className: "ph-bold ph-plus" })
       )
     ),
 
@@ -207,7 +207,7 @@ function App() {
                 cursor: "pointer",
               },
             },
-            e("i", { className: "ph ph-trash" })
+            e("i", { className: "ph-bold ph-trash" })
           )
         )
       )
