@@ -41,6 +41,10 @@ init().catch((err) => {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/service-worker.js", (req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/api/tasks", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM tasks ORDER BY id DESC");
