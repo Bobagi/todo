@@ -89,12 +89,10 @@ function App() {
         "button",
         {
           onClick: addTask,
-          style: {
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          },
+          title: "Add task", // acessibilidade
+          style: { fontSize: "1.25em", padding: "0.4em" },
         },
-        "Add"
+        e("i", { className: "ph ph-plus" })
       )
     ),
 
@@ -118,7 +116,15 @@ function App() {
             e("span", null, task.title)
           ),
           " ",
-          e("button", { onClick: () => deleteTask(task.id) }, "x")
+          e(
+            "button",
+            {
+              onClick: () => deleteTask(task.id),
+              title: "Delete",
+              style: { fontSize: "1.2em", color: "#000000" },
+            },
+            e("i", { className: "ph ph-trash" })
+          )
         )
       )
     )
