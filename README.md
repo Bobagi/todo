@@ -12,7 +12,7 @@ A minimalist **Todo List** PWA, containerized with Docker:
 ## 🚀 Quick Start
 
 ```
-docker compose up --build -d
+npm run build
 ```
 
 - Builds Docker images  

@@ -31,12 +31,21 @@ function App() {
   };
 
   const toggleDone = async (task) => {
-    await fetch("/api/tasks/" + task.id, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !task.done }),
-    });
-    fetchTasks();
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t))
+    );
+
+    try {
+      await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: !task.done }),
+      });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, done: task.done } : t))
+      );
+    }
   };
 
   return e(
@@ -71,10 +80,12 @@ function App() {
       "Organize. Simplify. Dominate."
     ),
 
-    // Footer: input + Add button (CSS .footer fixa só no mobile)
+    // Input + Add button
     e(
       "div",
-      { className: "footer" },
+      {
+        className: "footer",
+      },
       e("input", {
         value: title,
         onChange: (e) => setTitle(e.target.value),
@@ -89,39 +100,112 @@ function App() {
         "button",
         {
           onClick: addTask,
-          title: "Add task", // acessibilidade
+          title: "Add task",
           style: { fontSize: "1.25em", padding: "0.4em" },
         },
         e("i", { className: "ph ph-plus" })
       )
     ),
 
-    // Task list (continues abaixo do footer in desktop; on mobile footer is fixed)
+    // Task list
     e(
       "ul",
       null,
       tasks.map((task) =>
         e(
           "li",
-          { key: task.id },
+          {
+            key: task.id,
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem",
+            },
+          },
           e(
-            "label",
-            null,
-            e("input", {
-              type: "checkbox",
-              checked: task.done,
-              onChange: () => toggleDone(task),
-            }),
-            " ",
-            e("span", null, task.title)
+            "div",
+            {
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                flexGrow: 1,
+              },
+            },
+            e(
+              "label",
+              { className: "neon-checkbox" },
+              e("input", {
+                type: "checkbox",
+                checked: task.done,
+                onChange: () => toggleDone(task),
+              }),
+              e("div", { className: "neon-checkbox__frame" }, [
+                e("div", { className: "neon-checkbox__box" }, [
+                  e("div", { className: "neon-checkbox__check-container" }, [
+                    e(
+                      "svg",
+                      {
+                        viewBox: "0 0 24 24",
+                        className: "neon-checkbox__check",
+                      },
+                      e("path", { d: "M3,12.5l7,7L21,5" })
+                    ),
+                  ]),
+                  e("div", { className: "neon-checkbox__glow" }),
+                  e("div", { className: "neon-checkbox__borders" }, [
+                    e("span"),
+                    e("span"),
+                    e("span"),
+                    e("span"),
+                  ]),
+                ]),
+                e("div", { className: "neon-checkbox__effects" }, [
+                  e(
+                    "div",
+                    { className: "neon-checkbox__particles" },
+                    Array.from({ length: 12 }, () => e("span"))
+                  ),
+                  e("div", { className: "neon-checkbox__rings" }, [
+                    e("div", { className: "ring" }),
+                    e("div", { className: "ring" }),
+                    e("div", { className: "ring" }),
+                  ]),
+                  e("div", { className: "neon-checkbox__sparks" }, [
+                    e("span"),
+                    e("span"),
+                    e("span"),
+                    e("span"),
+                  ]),
+                ]),
+              ])
+            ),
+            e(
+              "span",
+              {
+                style: {
+                  textDecoration: task.done ? "line-through" : "none",
+                  color: task.done ? "#888" : "#fff",
+                },
+              },
+              task.title
+            )
           ),
-          " ",
           e(
             "button",
             {
               onClick: () => deleteTask(task.id),
               title: "Delete",
-              style: { fontSize: "1.2em", color: "#000000" },
+              style: {
+                fontSize: "1.2em",
+                background: "#FFD700",
+                color: "#000",
+                border: "none",
+                borderRadius: "4px",
+                padding: "0.5em",
+                cursor: "pointer",
+              },
             },
             e("i", { className: "ph ph-trash" })
           )
@@ -133,7 +217,7 @@ function App() {
 
 ReactDOM.render(e(App), document.getElementById("root"));
 
-// PWA install button logic
+// PWA install logic
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 

@@ -89,6 +89,7 @@ input[type="checkbox"] {
     bottom: 0;
     left: 0;
     right: 0;
+    max-width: none;
     padding: 0.75rem;
     background-color: #0d0d0d;
     border-top: 1px solid #333;
