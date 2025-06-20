@@ -1,60 +1,71 @@
-# todo
+# To do
 
-This is a simple **Todo List** application containerized with Docker:
+A minimalist **Todo List** PWA, containerized with Docker:
 
 - **Backend**: Node.js + Express  
-- **Frontend**: React served as a Progressive Web App (PWA)  
+- **Frontend**: React (no build tool) styled via CSS  
+- **PWA**: installable, offline-capable (manifest + service worker)  
+- **Responsive**: fixed footer on mobile, inline form on desktop  
+- **Styling**: dark theme with yellow accents  
 - **Database**: PostgreSQL  
-
-The app exposes a REST API for managing tasks and serves a React PWA that can be installed on desktop or mobile devices.
 
 ## 🚀 Quick Start
 
-```sh
+```
 docker compose up --build -d
 ```
 
-- Builds the images  
+- Builds Docker images  
 - Starts PostgreSQL with persistent storage  
-- Starts the web server (API + PWA)  
+- Launches the web server (API + PWA)
 
-## 🔗 Access the App
+## ⚙️ Environment Configuration
 
-By default, open:
-
-```
-http://localhost:3051
-```
-
-In environments like Codespaces, Gitpod, or on your VPS with HTTPS, check the **web** container logs. Look for:
+Create a `.env` file at the root:
 
 ```
-Server running at https://3051-your-environment-url
-Open https://3051-your-environment-url in your browser.
+POSTGRES_USER=todo
+POSTGRES_PASSWORD=todo
+POSTGRES_DB=todo
+WEB_PORT=3051
 ```
 
-## 📦 Project Structure
+## 🔗 Access
 
-- `public/` — static files (HTML, manifest.json, icons, service-worker.js)  
-- `app.js` — React frontend code  
-- `server.js` — Express backend  
-- `.env` — database credentials and external port  
-- `docker-compose.yml` — service definitions  
-- `Dockerfile` — builds combined backend + frontend image  
+- On desktop: http://localhost:3051  
+- On VPS: make sure Nginx proxies to `localhost:${WEB_PORT}` over HTTPS  
+- On Codespaces/Gitpod: check web container logs for exposed URL
 
-## 📱 Installing as a PWA
+## 📱 Mobile Behavior
 
-The app includes `manifest.json` and `service-worker.js`. Browsers will show an **Install app** option when:
+- On small screens (≤768px), the input + Add button are **fixed at the bottom**  
+- On desktop, they appear above the task list as normal
 
-- Served over **HTTPS** (or `localhost`)  
-- The PWA criteria are met  
+## 📁 Project Structure
 
-Make sure your VPS has SSL (e.g., Let’s Encrypt).
+```
+/
+├── public/               # Static assets (index.html, manifest.json, icon.png, style.css, service-worker.js)
+├── app.js                # React frontend logic
+├── server.js             # Express API and static file server
+├── .env                  # Database config
+├── Dockerfile            # Builds fullstack image
+└── docker-compose.yml    # Defines DB + Web services
+```
 
-## ⚠️ Note on Development
+## 📦 PWA Install Support
 
-This project was initially generated with **OpenAI Codex**. Due to its limitations and hallucinations, significant manual restructuring was required to:
+Install prompt appears when:
 
-- Unify client and server folders  
-- Configure Docker volumes and health checks  
-- Ensure real PWA compatibility  
+- Served via HTTPS or `localhost`  
+- Browser criteria are met  
+- App isn't already installed (auto-hidden otherwise)
+
+## ⚠️ Notes
+
+This project was initially created with **OpenAI Codex**, but restructured manually to:
+
+- Unify client/server architecture  
+- Implement proper PWA behavior  
+- Support Docker volumes and PostgreSQL health checks  
+- Deliver responsive UX tuned for mobile and desktop
