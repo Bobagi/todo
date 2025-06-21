@@ -8,12 +8,12 @@
   "description": "Organize. Simplify. Dominate.",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon_transparecy.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon_transparecy.png",
       "sizes": "512x512",
       "type": "image/png"
     }
