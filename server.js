@@ -27,10 +27,14 @@ async function init(retries = 5) {
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
+        username TEXT UNIQUE,
+        email TEXT UNIQUE,
         password TEXT,
         google_id TEXT
       )`);
+      await pool.query(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE"
+      );
       await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -60,9 +64,13 @@ app.use("/service-worker.js", (req, res, next) => {
 });
 
 function generateToken(user) {
-  return jwt.sign({ id: user.id, email: user.email }, jwtSecret, {
-    expiresIn: "7d",
-  });
+  return jwt.sign(
+    { id: user.id, username: user.username, email: user.email },
+    jwtSecret,
+    {
+      expiresIn: "7d",
+    }
+  );
 }
 
 function auth(req, res, next) {
@@ -78,14 +86,14 @@ function auth(req, res, next) {
 }
 
 app.post("/api/register", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ error: "email and password required" });
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ error: "username and password required" });
   try {
     const hashed = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
-      "INSERT INTO users(email,password) VALUES($1,$2) RETURNING id,email",
-      [email, hashed]
+      "INSERT INTO users(username,password) VALUES($1,$2) RETURNING id,username",
+      [username, hashed]
     );
     return res.json({ token: generateToken(rows[0]) });
   } catch (err) {
@@ -97,9 +105,9 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  const { rows } = await pool.query("SELECT * FROM users WHERE email=$1", [
-    email,
+  const { username, password } = req.body;
+  const { rows } = await pool.query("SELECT * FROM users WHERE username=$1", [
+    username,
   ]);
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password || ""))) {
@@ -140,7 +148,7 @@ app.post("/api/google-login", async (req, res) => {
 });
 
 app.get("/api/me", auth, async (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email });
+  res.json({ id: req.user.id, username: req.user.username, email: req.user.email });
 });
 
 app.get("/api/tasks", auth, async (req, res) => {
