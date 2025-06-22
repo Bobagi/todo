@@ -3,22 +3,34 @@ const e = React.createElement;
 function App() {
   const [tasks, setTasks] = React.useState([]);
   const [title, setTitle] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [token, setToken] = React.useState(localStorage.getItem("token"));
+  const [isRegister, setIsRegister] = React.useState(false);
+
+  const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
   const fetchTasks = async () => {
-    const res = await fetch("/api/tasks");
+    if (!token) return;
+    const res = await fetch("/api/tasks", { headers: authHeaders });
+    if (res.status === 401) {
+      setToken(null);
+      localStorage.removeItem("token");
+      return;
+    }
     const data = await res.json();
     setTasks(data);
   };
 
   React.useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [token]);
 
   const addTask = async () => {
     if (!title.trim()) return;
     await fetch("/api/tasks", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ title }),
     });
     setTitle("");
@@ -26,7 +38,7 @@ function App() {
   };
 
   const deleteTask = async (id) => {
-    await fetch("/api/tasks/" + id, { method: "DELETE" });
+    await fetch("/api/tasks/" + id, { method: "DELETE", headers: authHeaders });
     fetchTasks();
   };
 
@@ -34,11 +46,10 @@ function App() {
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t))
     );
-
     try {
       await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ done: !task.done }),
       });
     } catch {
@@ -48,25 +59,105 @@ function App() {
     }
   };
 
+  const handleAuth = async () => {
+    const endpoint = isRegister ? "/api/register" : "/api/login";
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setEmail("");
+      setPassword("");
+    } else {
+      alert(data.error || "Auth error");
+    }
+  };
+
+  window.handleCredentialResponse = async (response) => {
+    const res = await fetch("/api/google-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      fetchTasks();
+    } else {
+      alert(data.error || "Google auth error");
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    setTasks([]);
+  };
+
+  if (!token) {
+    return e(
+      "div",
+      { style: { maxWidth: "400px", margin: "2rem auto" } },
+      e("h2", null, isRegister ? "Register" : "Login"),
+      e("input", {
+        placeholder: "Email",
+        value: email,
+        onChange: (e) => setEmail(e.target.value),
+        style: { width: "100%", marginBottom: "0.5rem" },
+      }),
+      e("input", {
+        type: "password",
+        placeholder: "Password",
+        value: password,
+        onChange: (e) => setPassword(e.target.value),
+        style: { width: "100%", marginBottom: "0.5rem" },
+      }),
+      e(
+        "button",
+        { onClick: handleAuth, style: { width: "100%", marginBottom: "0.5rem" } },
+        isRegister ? "Register" : "Login"
+      ),
+      e(
+        "button",
+        { onClick: () => setIsRegister(!isRegister), style: { width: "100%" } },
+        isRegister ? "Have an account? Login" : "No account? Register"
+      ),
+      e("div", { style: { marginTop: "1rem" } },
+        e("div", {
+          id: "g_id_onload",
+          "data-client_id": "GOOGLE_CLIENT_ID",
+          "data-callback": "handleCredentialResponse",
+        }),
+        e("div", { className: "g_id_signin", "data-type": "standard" })
+      )
+    );
+  }
+
   return e(
     "div",
     null,
-
-    // Header
     e(
       "div",
       { style: { display: "flex", alignItems: "center", gap: "0.75rem" } },
       e("img", { src: "icon.png", alt: "Logo", style: { height: "1.8em" } }),
       e("h1", { style: { margin: 0 } }, "To do"),
+      e(
+        "button",
+        { onClick: logout, style: { marginLeft: "auto" } },
+        "Logout"
+      ),
       !window.matchMedia("(display-mode: standalone)").matches &&
         e(
           "button",
-          { id: "install-btn", style: { marginLeft: "auto" } },
+          { id: "install-btn", style: { marginLeft: "0.5rem" } },
           "Install app"
         )
     ),
-
-    // Slogan
     e(
       "div",
       {
@@ -79,8 +170,6 @@ function App() {
       },
       "Organize. Simplify. Dominate."
     ),
-
-    // Input + Add button
     e(
       "div",
       {
@@ -106,8 +195,6 @@ function App() {
         e("i", { className: "ph-bold ph-plus" })
       )
     ),
-
-    // Task list
     e(
       "ul",
       null,
