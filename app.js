@@ -146,17 +146,17 @@ function App() {
       { style: { display: "flex", alignItems: "center", gap: "0.75rem" } },
       e("img", { src: "icon.png", alt: "Logo", style: { height: "1.8em" } }),
       e("h1", { style: { margin: 0 } }, "To do"),
-      e(
-        "button",
-        { onClick: logout, style: { marginLeft: "auto" } },
-        "Logout"
-      ),
       !window.matchMedia("(display-mode: standalone)").matches &&
         e(
           "button",
           { id: "install-btn", style: { marginLeft: "0.5rem" } },
           "Install app"
-        )
+        ),
+      e(
+        "button",
+        { onClick: logout, style: { marginLeft: "auto" } },
+        "Logout"
+      )
     ),
     e(
       "div",
