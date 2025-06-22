@@ -9,6 +9,18 @@ body {
   align-items: center;
 }
 
+/* Auth form */
+.auth-input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  box-sizing: border-box;
+}
+
+.auth-button {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
 h1 {
   margin-bottom: 1rem;
   font-size: 2rem;

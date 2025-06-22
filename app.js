@@ -108,23 +108,23 @@ function App() {
         placeholder: "Username",
         value: username,
         onChange: (e) => setUsername(e.target.value),
-        style: { width: "100%", marginBottom: "0.5rem" },
+        className: "auth-input",
       }),
       e("input", {
         type: "password",
         placeholder: "Password",
         value: password,
         onChange: (e) => setPassword(e.target.value),
-        style: { width: "100%", marginBottom: "0.5rem" },
+        className: "auth-input",
       }),
       e(
         "button",
-        { onClick: handleAuth, style: { width: "100%", marginBottom: "0.5rem" } },
+        { onClick: handleAuth, className: "auth-button" },
         isRegister ? "Register" : "Login"
       ),
       e(
         "button",
-        { onClick: () => setIsRegister(!isRegister), style: { width: "100%" } },
+        { onClick: () => setIsRegister(!isRegister), className: "auth-button" },
         isRegister ? "Have an account? Login" : "No account? Register"
       ),
       e("div", { style: { marginTop: "1rem" } },
@@ -134,9 +134,8 @@ function App() {
           "data-callback": "handleCredentialResponse",
         }),
         e("div", {
-          className: "g_id_signin",
+          className: "g_id_signin auth-button",
           "data-type": "standard",
-          style: { width: "100%" },
         })
       )
     );
