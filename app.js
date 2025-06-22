@@ -3,7 +3,7 @@ const e = React.createElement;
 function App() {
   const [tasks, setTasks] = React.useState([]);
   const [title, setTitle] = React.useState("");
-  const [email, setEmail] = React.useState("");
+  const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [token, setToken] = React.useState(localStorage.getItem("token"));
   const [isRegister, setIsRegister] = React.useState(false);
@@ -64,13 +64,13 @@ function App() {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
     if (res.ok) {
       localStorage.setItem("token", data.token);
       setToken(data.token);
-      setEmail("");
+      setUsername("");
       setPassword("");
     } else {
       alert(data.error || "Auth error");
@@ -105,9 +105,9 @@ function App() {
       { style: { maxWidth: "400px", margin: "2rem auto" } },
       e("h2", null, isRegister ? "Register" : "Login"),
       e("input", {
-        placeholder: "Email",
-        value: email,
-        onChange: (e) => setEmail(e.target.value),
+        placeholder: "Username",
+        value: username,
+        onChange: (e) => setUsername(e.target.value),
         style: { width: "100%", marginBottom: "0.5rem" },
       }),
       e("input", {
@@ -133,7 +133,11 @@ function App() {
           "data-client_id": "GOOGLE_CLIENT_ID",
           "data-callback": "handleCredentialResponse",
         }),
-        e("div", { className: "g_id_signin", "data-type": "standard" })
+        e("div", {
+          className: "g_id_signin",
+          "data-type": "standard",
+          style: { width: "100%" },
+        })
       )
     );
   }
