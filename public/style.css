@@ -17,14 +17,8 @@ body {
 }
 
 .auth-button {
-  width: 109%;
+  width: 100%;
   margin-bottom: 0.5rem;
-}
-
-@media (max-width: 768px) {
-  .auth-button {
-    width: 115%;
-  }
 }
 
 h1 {
