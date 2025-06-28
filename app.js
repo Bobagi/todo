@@ -139,7 +139,9 @@ function App() {
         { onClick: () => setIsRegister(!isRegister), className: "auth-button" },
         isRegister ? "Have an account? Login" : "No account? Register"
       ),
-      e("div", { style: { marginTop: "1rem" } },
+      e(
+        "div",
+        { style: { marginTop: "1rem" } },
         e("div", {
           id: "g_id_onload",
           "data-client_id": "GOOGLE_CLIENT_ID",
@@ -167,11 +169,7 @@ function App() {
           { id: "install-btn", style: { marginLeft: "0.5rem" } },
           "Install app"
         ),
-      e(
-        "button",
-        { onClick: logout, style: { marginLeft: "auto" } },
-        "Logout"
-      )
+      e("button", { onClick: logout, style: { marginLeft: "auto" } }, "Logout")
     ),
     e(
       "div",
@@ -228,13 +226,13 @@ function App() {
               display: "flex",
               alignItems: "center",
               width: "100%",
+              padding: "2%",
             },
           },
           e(
             "div",
             {
               style: {
-                flex: "0 0 10%",
                 display: "flex",
                 justifyContent: "center",
               },
@@ -292,8 +290,10 @@ function App() {
             "div",
             {
               style: {
-                flex: "0 0 80%",
                 wordBreak: "break-word",
+                width: "100%",
+                paddingLeft: "10px",
+                paddingRight: "10px",
               },
             },
             e(
@@ -311,7 +311,6 @@ function App() {
             "div",
             {
               style: {
-                flex: "0 0 10%",
                 display: "flex",
                 justifyContent: "center",
               },
