@@ -35,6 +35,9 @@ async function init(retries = 5) {
       await pool.query(
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE"
       );
+      await pool.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON users (LOWER(username))"
+      );
       await pool.query(`CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -90,6 +93,13 @@ app.post("/api/register", async (req, res) => {
   if (!username || !password)
     return res.status(400).json({ error: "username and password required" });
   try {
+    const { rows: existing } = await pool.query(
+      "SELECT id FROM users WHERE LOWER(username)=LOWER($1)",
+      [username]
+    );
+    if (existing.length)
+      return res.status(400).json({ error: "user exists" });
+
     const hashed = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
       "INSERT INTO users(username,password) VALUES($1,$2) RETURNING id,username",
@@ -106,9 +116,10 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
-  const { rows } = await pool.query("SELECT * FROM users WHERE username=$1", [
-    username,
-  ]);
+  const { rows } = await pool.query(
+    "SELECT * FROM users WHERE LOWER(username)=LOWER($1)",
+    [username]
+  );
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password || ""))) {
     return res.status(400).json({ error: "invalid credentials" });
