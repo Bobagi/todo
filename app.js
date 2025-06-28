@@ -108,6 +108,12 @@ function App() {
         placeholder: "Username",
         value: username,
         onChange: (e) => setUsername(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            console.log("Auth triggered by Enter");
+            handleAuth();
+          }
+        },
         className: "auth-input",
       }),
       e("input", {
@@ -115,6 +121,12 @@ function App() {
         placeholder: "Password",
         value: password,
         onChange: (e) => setPassword(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            console.log("Auth triggered by Enter");
+            handleAuth();
+          }
+        },
         className: "auth-input",
       }),
       e(
@@ -181,6 +193,12 @@ function App() {
       e("input", {
         value: title,
         onChange: (e) => setTitle(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            console.log("Adding task via Enter");
+            addTask();
+          }
+        },
         placeholder: "New task",
         style: {
           flexGrow: 1,
