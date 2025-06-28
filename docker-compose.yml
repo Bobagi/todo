@@ -3,6 +3,7 @@ version: "3.8"
 services:
   web:
     build: .
+    restart: on-failure
     ports:
       - "${WEB_PORT}:3000"
     env_file:
@@ -13,6 +14,7 @@ services:
 
   db:
     image: postgres:14
+    restart: on-failure
     env_file:
       - .env
     environment:

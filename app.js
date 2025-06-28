@@ -139,7 +139,9 @@ function App() {
         { onClick: () => setIsRegister(!isRegister), className: "auth-button" },
         isRegister ? "Have an account? Login" : "No account? Register"
       ),
-      e("div", { style: { marginTop: "1rem" } },
+      e(
+        "div",
+        { style: { marginTop: "1rem" } },
         e("div", {
           id: "g_id_onload",
           "data-client_id": "GOOGLE_CLIENT_ID",
@@ -167,11 +169,7 @@ function App() {
           { id: "install-btn", style: { marginLeft: "0.5rem" } },
           "Install app"
         ),
-      e(
-        "button",
-        { onClick: logout, style: { marginLeft: "auto" } },
-        "Logout"
-      )
+      e("button", { onClick: logout, style: { marginLeft: "auto" } }, "Logout")
     ),
     e(
       "div",
@@ -227,8 +225,8 @@ function App() {
             style: {
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: "1rem",
+              width: "100%",
+              padding: "2%",
             },
           },
           e(
@@ -236,9 +234,7 @@ function App() {
             {
               style: {
                 display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                flexGrow: 1,
+                justifyContent: "center",
               },
             },
             e(
@@ -288,7 +284,18 @@ function App() {
                   ]),
                 ]),
               ])
-            ),
+            )
+          ),
+          e(
+            "div",
+            {
+              style: {
+                wordBreak: "break-word",
+                width: "100%",
+                paddingLeft: "10px",
+                paddingRight: "10px",
+              },
+            },
             e(
               "span",
               {
@@ -301,21 +308,30 @@ function App() {
             )
           ),
           e(
-            "button",
+            "div",
             {
-              onClick: () => deleteTask(task.id),
-              title: "Delete",
               style: {
-                fontSize: "1.2em",
-                background: "#FFD700",
-                color: "#000",
-                border: "none",
-                borderRadius: "4px",
-                padding: "0.5em",
-                cursor: "pointer",
+                display: "flex",
+                justifyContent: "center",
               },
             },
-            e("i", { className: "ph-bold ph-trash" })
+            e(
+              "button",
+              {
+                onClick: () => deleteTask(task.id),
+                title: "Delete",
+                style: {
+                  fontSize: "1.2em",
+                  background: "#FFD700",
+                  color: "#000",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "0.5em",
+                  cursor: "pointer",
+                },
+              },
+              e("i", { className: "ph-bold ph-trash" })
+            )
           )
         )
       )
