@@ -227,18 +227,16 @@ function App() {
             style: {
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: "1rem",
+              width: "100%",
             },
           },
           e(
             "div",
             {
               style: {
+                flex: "0 0 10%",
                 display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                flexGrow: 1,
+                justifyContent: "center",
               },
             },
             e(
@@ -288,7 +286,16 @@ function App() {
                   ]),
                 ]),
               ])
-            ),
+            )
+          ),
+          e(
+            "div",
+            {
+              style: {
+                flex: "0 0 80%",
+                wordBreak: "break-word",
+              },
+            },
             e(
               "span",
               {
@@ -301,21 +308,31 @@ function App() {
             )
           ),
           e(
-            "button",
+            "div",
             {
-              onClick: () => deleteTask(task.id),
-              title: "Delete",
               style: {
-                fontSize: "1.2em",
-                background: "#FFD700",
-                color: "#000",
-                border: "none",
-                borderRadius: "4px",
-                padding: "0.5em",
-                cursor: "pointer",
+                flex: "0 0 10%",
+                display: "flex",
+                justifyContent: "center",
               },
             },
-            e("i", { className: "ph-bold ph-trash" })
+            e(
+              "button",
+              {
+                onClick: () => deleteTask(task.id),
+                title: "Delete",
+                style: {
+                  fontSize: "1.2em",
+                  background: "#FFD700",
+                  color: "#000",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "0.5em",
+                  cursor: "pointer",
+                },
+              },
+              e("i", { className: "ph-bold ph-trash" })
+            )
           )
         )
       )
