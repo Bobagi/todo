@@ -5,6 +5,7 @@ function App() {
   const [title, setTitle] = React.useState("");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
   const [token, setToken] = React.useState(localStorage.getItem("token"));
   const [isRegister, setIsRegister] = React.useState(false);
 
@@ -103,7 +104,7 @@ function App() {
     return e(
       "div",
       { style: { maxWidth: "400px", margin: "2rem auto" } },
-      e("h2", null, isRegister ? "Register" : "Login"),
+      e("h2", null, isRegister ? "Create account" : "Login"),
       e("input", {
         placeholder: "Username",
         maxLength: 50,
@@ -131,10 +132,21 @@ function App() {
         },
         className: "auth-input",
       }),
+      isRegister &&
+        e("input", {
+          type: "password",
+          placeholder: "Confirm password",
+          value: confirmPassword,
+          onChange: (e) => setConfirmPassword(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "Enter") handleAuth();
+          },
+          className: "auth-input",
+        }),
       e(
         "button",
         { onClick: handleAuth, className: "auth-button" },
-        isRegister ? "Register" : "Login"
+        isRegister ? "Create new account" : "Login"
       ),
       e(
         "button",
