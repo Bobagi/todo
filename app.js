@@ -168,10 +168,26 @@ function App() {
       !window.matchMedia("(display-mode: standalone)").matches &&
         e(
           "button",
-          { id: "install-btn", style: { marginLeft: "0.5rem" } },
+          {
+            id: "install-btn",
+            style: {
+              marginLeft: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+            },
+          },
+          e("i", { className: "ph-bold ph-download-simple" }),
           "Install app"
         ),
-      e("button", { onClick: logout, style: { marginLeft: "auto" } }, "Logout")
+      e(
+        "button",
+        {
+          onClick: logout,
+          style: { marginLeft: "auto", display: "flex", alignItems: "center" },
+        },
+        e("i", { className: "ph-bold ph-sign-out" })
+      )
     ),
     e(
       "div",
