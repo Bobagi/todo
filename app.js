@@ -106,6 +106,7 @@ function App() {
       e("h2", null, isRegister ? "Register" : "Login"),
       e("input", {
         placeholder: "Username",
+        maxLength: 50,
         value: username,
         onChange: (e) => setUsername(e.target.value),
         onKeyDown: (e) => {
@@ -118,6 +119,7 @@ function App() {
       }),
       e("input", {
         type: "password",
+        maxLength: 50,
         placeholder: "Password",
         value: password,
         onChange: (e) => setPassword(e.target.value),
@@ -190,6 +192,7 @@ function App() {
       },
       e("input", {
         value: title,
+        maxLength: 200,
         onChange: (e) => setTitle(e.target.value),
         onKeyDown: (e) => {
           if (e.key === "Enter") {
