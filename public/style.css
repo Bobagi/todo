@@ -93,8 +93,8 @@ input[type="checkbox"] {
   box-sizing: border-box;
 }
 
-/* mobile: fixa no rodapé */
-@media (max-width: 768px) {
+/* mobile ou PWA standalone: fixa no rodapé */
+@media (max-width: 768px), (display-mode: standalone) {
   .footer {
     position: fixed;
     bottom: 0;
@@ -105,6 +105,6 @@ input[type="checkbox"] {
     background-color: #0d0d0d;
     border-top: 1px solid #333;
     margin: 0;
-    z-index:1000;
+    z-index: 1000;
   }
 }
