@@ -4,6 +4,8 @@
   --primary-dark: #ccac00;
   --primary-light: #fff799;
   --size: 30px;
+  flex-shrink: 0;
+  flex-grow: 0;
   position: relative;
   width: var(--size);
   height: var(--size);
