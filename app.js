@@ -338,8 +338,25 @@ function App() {
                     value: editingTitle,
                     autoFocus: true,
                     onChange: (e) => setEditingTitle(e.target.value),
-                    onKeyDown: (e) => {
-                      if (e.key === "Escape") setEditingTaskId(null);
+                    onBlur: () => setEditingTaskId(null), // deselect ao clicar fora
+                    onKeyDown: async (e) => {
+                      if (e.key === "Enter") {
+                        // Enter = confirmar
+                        await fetch(`/api/tasks/${editingTaskId}`, {
+                          method: "PUT",
+                          headers: {
+                            "Content-Type": "application/json",
+                            ...authHeaders,
+                          },
+                          body: JSON.stringify({ title: editingTitle }),
+                        });
+                        setEditingTaskId(null);
+                        fetchTasks();
+                        return;
+                      }
+                      if (e.key === "Escape")
+                        // Escape = cancelar
+                        setEditingTaskId(null);
                     },
                     className: "auth-input",
                     style: { flexGrow: 1 },
