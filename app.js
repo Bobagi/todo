@@ -8,6 +8,8 @@ function App() {
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [token, setToken] = React.useState(localStorage.getItem("token"));
   const [isRegister, setIsRegister] = React.useState(false);
+  const [editingTaskId, setEditingTaskId] = React.useState(null);
+  const [editingTitle, setEditingTitle] = React.useState("");
 
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
@@ -327,25 +329,71 @@ function App() {
                 paddingRight: "10px",
               },
             },
-            e(
-              "span",
-              {
-                style: {
-                  textDecoration: task.done ? "line-through" : "none",
-                  color: task.done ? "#888" : "#fff",
-                },
-              },
-              task.title
-            )
+            editingTaskId === task.id
+              ? e(
+                  "div",
+                  { style: { display: "flex", gap: "0.5rem", width: "100%" } },
+                  e("input", {
+                    type: "text",
+                    value: editingTitle,
+                    autoFocus: true,
+                    onChange: (e) => setEditingTitle(e.target.value),
+                    onKeyDown: (e) => {
+                      if (e.key === "Escape") setEditingTaskId(null);
+                    },
+                    className: "auth-input",
+                    style: { flexGrow: 1 },
+                  }),
+                  e(
+                    "button",
+                    {
+                      onClick: async () => {
+                        await fetch(`/api/tasks/${editingTaskId}`, {
+                          method: "PUT",
+                          headers: {
+                            "Content-Type": "application/json",
+                            ...authHeaders,
+                          },
+                          body: JSON.stringify({ title: editingTitle }),
+                        });
+                        setEditingTaskId(null);
+                        fetchTasks();
+                      },
+                      style: {
+                        fontSize: "1.2em",
+                        background: "#28a745",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "0.5em",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      },
+                    },
+                    e("i", { className: "ph-bold ph-check-circle" })
+                  )
+                )
+              : e(
+                  "span",
+                  {
+                    style: {
+                      textDecoration: task.done ? "line-through" : "none",
+                      color: task.done ? "#888" : "#fff",
+                      cursor: "pointer",
+                    },
+                    onClick: () => {
+                      setEditingTaskId(task.id);
+                      setEditingTitle(task.title);
+                    },
+                  },
+                  task.title
+                )
           ),
           e(
             "div",
-            {
-              style: {
-                display: "flex",
-                justifyContent: "center",
-              },
-            },
+            { style: { display: "flex", justifyContent: "center" } },
             e(
               "button",
               {
