@@ -244,7 +244,10 @@ function App() {
           title: "Add task",
           style: { fontSize: "1.25em", padding: "0.4em" },
         },
-        e("i", { className: "ph-bold ph-plus" })
+        e("i", {
+          className: "ph-bold ph-plus",
+          style: { verticalAlign: "middle" },
+        })
       )
     ),
     e(
@@ -426,7 +429,10 @@ function App() {
                   cursor: "pointer",
                 },
               },
-              e("i", { className: "ph-bold ph-trash" })
+              e("i", {
+                className: "ph-bold ph-trash",
+                style: { verticalAlign: "middle" },
+              })
             )
           )
         )
