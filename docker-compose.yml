@@ -8,9 +8,26 @@ services:
       - "${WEB_PORT}:3000"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
     depends_on:
       db:
         condition: service_healthy
+
+  studio:
+    build: .
+    restart: on-failure
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: [""]
+    command: sh -c "npx prisma generate && npx prisma studio --port 5555 --hostname 0.0.0.0 --browser none"
+    ports:
+      - "${PRISMA_STUDIO_PORT:-5555}:5555"
 
   db:
     image: postgres:14

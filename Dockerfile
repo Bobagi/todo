@@ -2,12 +2,19 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+
+COPY package*.json ./
+RUN npm install && npm install prisma @prisma/client
+
+COPY prisma ./prisma
+RUN npx prisma generate
+
 COPY . .
-
-RUN npm install
-
 RUN cp app.js public/
 
-EXPOSE 3000
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-CMD ["node", "server.js"]
+EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

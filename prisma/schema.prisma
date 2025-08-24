@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String?  @db.Text
+  email     String?  @db.Text
+  password  String?  @db.Text
+  google_id String?  @db.Text @map("google_id")
+  tasks     Task[]
+  tabs      Tab[]
+  @@map("users")
+}
+
+model Tab {
+  id      Int     @id @default(autoincrement())
+  name    String  @db.Text
+  user_id Int
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tasks   Task[]
+  @@map("tabs")
+  @@index([user_id, name])
+}
+
+model Task {
+  id      Int     @id @default(autoincrement())
+  title   String  @db.Text
+  done    Boolean @default(false)
+  user_id Int
+  tab_id  Int?
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tab     Tab?    @relation(fields: [tab_id], references: [id], onDelete: Cascade)
+  @@map("tasks")
+  @@index([user_id])
+  @@index([tab_id])
+}

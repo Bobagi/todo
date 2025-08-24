@@ -2,6 +2,8 @@ const e = React.createElement;
 
 function App() {
   const [tasks, setTasks] = React.useState([]);
+  const [tabs, setTabs] = React.useState([]);
+  const [selectedTabId, setSelectedTabId] = React.useState(null);
   const [title, setTitle] = React.useState("");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -13,9 +15,23 @@ function App() {
 
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
+  const fetchTabs = async () => {
+    if (!token) return;
+    const res = await fetch("/api/tabs", { headers: authHeaders });
+    if (res.status === 401) {
+      setToken(null);
+      localStorage.removeItem("token");
+      return;
+    }
+    const data = await res.json();
+    setTabs(data);
+    if (!selectedTabId && data.length) setSelectedTabId(data[0].id);
+  };
+
   const fetchTasks = async () => {
     if (!token) return;
-    const res = await fetch("/api/tasks", { headers: authHeaders });
+    const query = selectedTabId ? `?tabId=${selectedTabId}` : "";
+    const res = await fetch("/api/tasks" + query, { headers: authHeaders });
     if (res.status === 401) {
       setToken(null);
       localStorage.removeItem("token");
@@ -26,15 +42,21 @@ function App() {
   };
 
   React.useEffect(() => {
-    fetchTasks();
+    if (!token) return;
+    fetchTabs();
   }, [token]);
+
+  React.useEffect(() => {
+    if (!token) return;
+    fetchTasks();
+  }, [token, selectedTabId]);
 
   const addTask = async () => {
     if (!title.trim()) return;
     await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, tabId: selectedTabId }),
     });
     setTitle("");
     fetchTasks();
@@ -90,7 +112,7 @@ function App() {
     if (res.ok) {
       localStorage.setItem("token", data.token);
       setToken(data.token);
-      fetchTasks();
+      fetchTabs();
     } else {
       alert(data.error || "Google auth error");
     }
@@ -100,6 +122,24 @@ function App() {
     localStorage.removeItem("token");
     setToken(null);
     setTasks([]);
+    setTabs([]);
+    setSelectedTabId(null);
+  };
+
+  const createTab = async () => {
+    const name = prompt("New tab name");
+    if (!name) return;
+    const res = await fetch("/api/tabs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      await fetchTabs();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Error creating tab");
+    }
   };
 
   if (!token) {
@@ -113,10 +153,7 @@ function App() {
         value: username,
         onChange: (e) => setUsername(e.target.value),
         onKeyDown: (e) => {
-          if (e.key === "Enter") {
-            console.log("Auth triggered by Enter");
-            handleAuth();
-          }
+          if (e.key === "Enter") handleAuth();
         },
         className: "auth-input",
       }),
@@ -127,10 +164,7 @@ function App() {
         value: password,
         onChange: (e) => setPassword(e.target.value),
         onKeyDown: (e) => {
-          if (e.key === "Enter") {
-            console.log("Auth triggered by Enter");
-            handleAuth();
-          }
+          if (e.key === "Enter") handleAuth();
         },
         className: "auth-input",
       }),
@@ -207,35 +241,67 @@ function App() {
       "div",
       {
         style: {
-          color: "#888",
-          fontSize: "0.9em",
-          marginTop: "0.25rem",
-          marginBottom: "0.75rem",
+          display: "flex",
+          gap: "0.5rem",
+          flexWrap: "wrap",
+          alignItems: "center",
+          margin: "0.5rem 0 0.75rem",
         },
       },
-      "Organize. Simplify. Dominate."
+      tabs.map((tab) =>
+        e(
+          "button",
+          {
+            key: tab.id,
+            onClick: () => setSelectedTabId(tab.id),
+            style: {
+              padding: "0.35rem 0.6rem",
+              borderRadius: "999px",
+              border: "1px solid #555",
+              background: selectedTabId === tab.id ? "#fff" : "transparent",
+              color: selectedTabId === tab.id ? "#000" : "#fff",
+              cursor: "pointer",
+            },
+            title: tab.name,
+          },
+          tab.name
+        )
+      ),
+      e(
+        "button",
+        {
+          onClick: createTab,
+          style: {
+            padding: "0.35rem 0.6rem",
+            borderRadius: "999px",
+            border: "1px dashed #777",
+            background: "transparent",
+            color: "#fff",
+            cursor: "pointer",
+          },
+          title: "New tab",
+        },
+        e("i", { className: "ph-bold ph-plus" }),
+        " New tab"
+      )
     ),
     e(
       "div",
-      {
-        className: "footer",
-      },
+      { style: { color: "#888", fontSize: "0.9em", marginBottom: "0.75rem" } },
+      tabs.find((t) => t.id === selectedTabId)?.name || "No tab selected"
+    ),
+    e(
+      "div",
+      { className: "footer" },
       e("input", {
         value: title,
         maxLength: 200,
         onChange: (e) => setTitle(e.target.value),
         onKeyDown: (e) => {
-          if (e.key === "Enter") {
-            console.log("Adding task via Enter");
-            addTask();
-          }
+          if (e.key === "Enter") addTask();
         },
         placeholder: "New task",
-        style: {
-          flexGrow: 1,
-          boxSizing: "border-box",
-          minWidth: 0,
-        },
+        style: { flexGrow: 1, boxSizing: "border-box", minWidth: 0 },
       }),
       e(
         "button",
@@ -243,6 +309,7 @@ function App() {
           onClick: addTask,
           title: "Add task",
           style: { fontSize: "1.25em", padding: "0.4em" },
+          disabled: !selectedTabId,
         },
         e("i", {
           className: "ph-bold ph-plus",
@@ -267,12 +334,7 @@ function App() {
           },
           e(
             "div",
-            {
-              style: {
-                display: "flex",
-                justifyContent: "center",
-              },
-            },
+            { style: { display: "flex", justifyContent: "center" } },
             e(
               "label",
               { className: "neon-checkbox" },
@@ -341,10 +403,9 @@ function App() {
                     value: editingTitle,
                     autoFocus: true,
                     onChange: (e) => setEditingTitle(e.target.value),
-                    onBlur: () => setEditingTaskId(null), // deselect ao clicar fora
+                    onBlur: () => setEditingTaskId(null),
                     onKeyDown: async (e) => {
                       if (e.key === "Enter") {
-                        // Enter = confirmar
                         await fetch(`/api/tasks/${editingTaskId}`, {
                           method: "PUT",
                           headers: {
@@ -357,9 +418,7 @@ function App() {
                         fetchTasks();
                         return;
                       }
-                      if (e.key === "Escape")
-                        // Escape = cancelar
-                        setEditingTaskId(null);
+                      if (e.key === "Escape") setEditingTaskId(null);
                     },
                     className: "auth-input",
                     style: { flexGrow: 1 },
@@ -443,7 +502,6 @@ function App() {
 
 ReactDOM.render(e(App), document.getElementById("root"));
 
-// PWA install logic
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 
