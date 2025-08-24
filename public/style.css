@@ -108,3 +108,69 @@ input[type="checkbox"] {
     z-index: 1000;
   }
 }
+
+.tabs-track {
+  scrollbar-width: thin;
+  scrollbar-color: #f1c40f #0d0d0d;
+}
+
+.tabs-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs-track::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+
+.tabs-track::-webkit-scrollbar-thumb {
+  background: #f1c40f;
+  border-radius: 4px;
+  box-shadow: 0 0 6px rgba(241, 196, 15, 0.35);
+}
+
+.tab-button,
+.new-tab-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-button::after,
+.new-tab-button::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 160px;
+  height: 160px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--mx, 50%) var(--my, 50%),
+    rgba(241, 196, 15, 0.35),
+    rgba(241, 196, 15, 0) 60%
+  );
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.tab-button:hover::after,
+.new-tab-button:hover::after {
+  opacity: 1;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffd700;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  filter: brightness(1.05);
+}

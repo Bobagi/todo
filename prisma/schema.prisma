@@ -19,13 +19,15 @@ model User {
 }
 
 model Tab {
-  id      Int     @id @default(autoincrement())
-  name    String  @db.Text
-  user_id Int
-  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  tasks   Task[]
+  id       Int     @id @default(autoincrement())
+  name     String  @db.Text
+  user_id  Int
+  position Int     @default(0)
+  user     User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tasks    Task[]
   @@map("tabs")
-  @@index([user_id, name])
+  @@index([user_id, position])
+  @@unique([user_id, name])
 }
 
 model Task {

@@ -15,6 +15,163 @@ function App() {
 
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
+  const [isDraggingTabs, setIsDraggingTabs] = React.useState(false);
+  const [draggingTabId, setDraggingTabId] = React.useState(null);
+  const tabElementRefs = React.useRef({});
+  const longPressTimerRef = React.useRef(null);
+  const pointerStartRef = React.useRef({ x: 0, y: 0 });
+  const isDraggingTabsRef = React.useRef(false);
+  const draggingTabIdRef = React.useRef(null);
+  const tabsRef = React.useRef([]);
+  const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
+  const [tabMenuPos, setTabMenuPos] = React.useState({ x: 0, y: 0 });
+
+  const setTabRef = (id) => (el) => {
+    tabElementRefs.current[id] = el;
+  };
+
+  const runFlip = (beforeLeftById) => {
+    requestAnimationFrame(() => {
+      Object.keys(beforeLeftById).forEach((id) => {
+        const el = tabElementRefs.current[id];
+        if (!el) return;
+        const afterLeft = el.getBoundingClientRect().left;
+        const dx = beforeLeftById[id] - afterLeft;
+        if (dx !== 0) {
+          el.style.transition = "none";
+          el.style.transform = `translateX(${dx}px)`;
+          requestAnimationFrame(() => {
+            el.style.transition = "transform 160ms ease";
+            el.style.transform = "translateX(0)";
+            setTimeout(() => {
+              el.style.transition = "";
+              el.style.transform = "";
+            }, 190);
+          });
+        }
+      });
+    });
+  };
+
+  const submitTabOrder = async (newTabs) => {
+    const orderedIds = newTabs.map((t) => t.id);
+    const res = await fetch("/api/tabs/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ orderedIds }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setTabs(data);
+    }
+  };
+
+  const beginRenameTab = async (tab) => {
+    const newName = prompt("Rename tab", tab.name);
+    if (!newName || newName.trim() === tab.name) return;
+    const res = await fetch(`/api/tabs/${tab.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    if (res.ok) fetchTabs();
+  };
+
+  const handleTabPointerDown = (tab, e) => {
+    const px = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
+    const py = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+    pointerStartRef.current = { x: px, y: py };
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      const el = tabElementRefs.current[tab.id];
+      const r = el?.getBoundingClientRect();
+      setTabMenuTargetId(tab.id);
+      setTabMenuPos({ x: r ? r.left : px, y: r ? r.bottom : py });
+      draggingTabIdRef.current = null;
+      setDraggingTabId(null);
+      isDraggingTabsRef.current = false;
+      setIsDraggingTabs(false);
+      window.removeEventListener("pointermove", handleTabPointerMove);
+      window.removeEventListener("pointerup", handleTabPointerUp);
+    }, 600);
+    draggingTabIdRef.current = tab.id;
+    setDraggingTabId(tab.id);
+    window.addEventListener("pointermove", handleTabPointerMove);
+    window.addEventListener("pointerup", handleTabPointerUp);
+  };
+
+  const handleTabPointerMove = (e) => {
+    const mx = e.clientX;
+    const my = e.clientY;
+    const dx = Math.abs(mx - pointerStartRef.current.x);
+    const dy = Math.abs(my - pointerStartRef.current.y);
+    if (dx > 8 || dy > 8) clearTimeout(longPressTimerRef.current);
+    if (!isDraggingTabsRef.current) {
+      if (dx > 6 || dy > 6) {
+        isDraggingTabsRef.current = true;
+        setIsDraggingTabs(true);
+      } else {
+        return;
+      }
+    }
+    const currentTabs = tabsRef.current;
+    const currentId = draggingTabIdRef.current;
+    const currentIndex = currentTabs.findIndex((t) => t.id === currentId);
+    if (currentIndex < 0) return;
+
+    const beforeLeftById = {};
+    currentTabs.forEach((t) => {
+      const el = tabElementRefs.current[t.id];
+      if (el) beforeLeftById[t.id] = el.getBoundingClientRect().left;
+    });
+
+    const centers = currentTabs.map((t) => {
+      const el = tabElementRefs.current[t.id];
+      if (!el) return Number.POSITIVE_INFINITY;
+      const r = el.getBoundingClientRect();
+      return r.left + r.width / 2;
+    });
+    let targetIndex = currentIndex;
+    for (let i = 0; i < centers.length; i++) {
+      if (mx < centers[i]) {
+        targetIndex = i;
+        break;
+      }
+      targetIndex = i;
+    }
+    if (targetIndex !== currentIndex) {
+      const newTabs = currentTabs.slice();
+      const [moved] = newTabs.splice(currentIndex, 1);
+      newTabs.splice(targetIndex, 0, moved);
+      setTabs(newTabs);
+      runFlip(beforeLeftById);
+    }
+  };
+
+  const handleTabPointerUp = async () => {
+    clearTimeout(longPressTimerRef.current);
+    window.removeEventListener("pointermove", handleTabPointerMove);
+    window.removeEventListener("pointerup", handleTabPointerUp);
+    if (isDraggingTabsRef.current && draggingTabIdRef.current != null) {
+      await submitTabOrder(tabsRef.current);
+    }
+    isDraggingTabsRef.current = false;
+    setIsDraggingTabs(false);
+    draggingTabIdRef.current = null;
+    setDraggingTabId(null);
+  };
+
+  const handleTabDoubleClick = (tab) => {
+    beginRenameTab(tab);
+  };
+
+  const handleGlowMove = (e) => {
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  };
+
   const fetchTabs = async () => {
     if (!token) return;
     const res = await fetch("/api/tabs", { headers: authHeaders });
@@ -30,8 +187,10 @@ function App() {
 
   const fetchTasks = async () => {
     if (!token) return;
-    const query = selectedTabId ? `?tabId=${selectedTabId}` : "";
-    const res = await fetch("/api/tasks" + query, { headers: authHeaders });
+    const queryString = selectedTabId ? `?tabId=${selectedTabId}` : "";
+    const res = await fetch("/api/tasks" + queryString, {
+      headers: authHeaders,
+    });
     if (res.status === 401) {
       setToken(null);
       localStorage.removeItem("token");
@@ -50,6 +209,22 @@ function App() {
     if (!token) return;
     fetchTasks();
   }, [token, selectedTabId]);
+
+  React.useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  const deleteTab = async (tabId) => {
+    const ok = confirm("Delete this tab and all its tasks?");
+    if (!ok) return;
+    await fetch(`/api/tabs/${tabId}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+    if (selectedTabId === tabId) setSelectedTabId(null);
+    setTabMenuTargetId(null);
+    await fetchTabs();
+  };
 
   const addTask = async () => {
     if (!title.trim()) return;
@@ -127,12 +302,12 @@ function App() {
   };
 
   const createTab = async () => {
-    const name = prompt("New tab name");
-    if (!name) return;
+    const newTabName = prompt("New tab name");
+    if (!newTabName) return;
     const res = await fetch("/api/tabs", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name: newTabName }),
     });
     if (res.ok) {
       await fetchTabs();
@@ -240,12 +415,19 @@ function App() {
     e(
       "div",
       {
+        className: "tabs-track",
         style: {
           display: "flex",
-          gap: "0.5rem",
-          flexWrap: "wrap",
-          alignItems: "center",
-          margin: "0.5rem 0 0.75rem",
+          alignItems: "flex-end",
+          gap: "0.25rem",
+          flexWrap: "nowrap",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
+          maxWidth: "400px",
+          padding: "0.25rem 0.25rem 0",
+          borderBottom: "2px solid #f1c40f22",
+          margin: "0.25rem 0 0.75rem",
         },
       },
       tabs.map((tab) =>
@@ -253,14 +435,38 @@ function App() {
           "button",
           {
             key: tab.id,
+            className: "tab-button",
+            ref: setTabRef(tab.id),
+            onPointerDown: (ev) => handleTabPointerDown(tab, ev),
+            onDoubleClick: () => handleTabDoubleClick(tab),
             onClick: () => setSelectedTabId(tab.id),
+            onMouseMove: handleGlowMove,
             style: {
-              padding: "0.35rem 0.6rem",
-              borderRadius: "999px",
-              border: "1px solid #555",
-              background: selectedTabId === tab.id ? "#fff" : "transparent",
-              color: selectedTabId === tab.id ? "#000" : "#fff",
+              flex: "0 0 auto",
+              position: "relative",
+              padding: "0.5rem 0.95rem",
+              borderTopLeftRadius: "10px",
+              borderTopRightRadius: "10px",
+              border:
+                selectedTabId === tab.id
+                  ? "2px solid #f1c40f"
+                  : "2px solid #f1c40f55",
+              borderBottom:
+                selectedTabId === tab.id
+                  ? "2px solid #0d0d0d"
+                  : "2px solid #f1c40f22",
+              background: selectedTabId === tab.id ? "#f1c40f" : "#0d0d0d",
+              color: selectedTabId === tab.id ? "#0d0d0d" : "#f1c40f",
+              marginBottom: selectedTabId === tab.id ? "-2px" : "0",
+              boxShadow:
+                selectedTabId === tab.id
+                  ? "0 -2px 10px rgba(241,196,15,0.25)"
+                  : "none",
+              transform: draggingTabId === tab.id ? "scale(0.98)" : "none",
+              opacity: draggingTabId === tab.id ? 0.9 : 1,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              userSelect: "none",
             },
             title: tab.name,
           },
@@ -270,13 +476,18 @@ function App() {
       e(
         "button",
         {
+          className: "new-tab-button",
           onClick: createTab,
+          onMouseMove: handleGlowMove,
           style: {
-            padding: "0.35rem 0.6rem",
-            borderRadius: "999px",
-            border: "1px dashed #777",
-            background: "transparent",
-            color: "#fff",
+            flex: "0 0 auto",
+            padding: "0.5rem 0.85rem",
+            borderTopLeftRadius: "10px",
+            borderTopRightRadius: "10px",
+            border: "2px dashed #f1c40f88",
+            background: "#0d0d0d",
+            color: "#f1c40f",
+            whiteSpace: "nowrap",
             cursor: "pointer",
           },
           title: "New tab",
@@ -285,11 +496,53 @@ function App() {
         " New tab"
       )
     ),
-    e(
-      "div",
-      { style: { color: "#888", fontSize: "0.9em", marginBottom: "0.75rem" } },
-      tabs.find((t) => t.id === selectedTabId)?.name || "No tab selected"
-    ),
+    tabMenuTargetId &&
+      e(
+        "div",
+        {
+          style: { position: "fixed", inset: 0, zIndex: 9999 },
+          onClick: () => setTabMenuTargetId(null),
+        },
+        e(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              top: tabMenuPos.y + window.scrollY,
+              left: tabMenuPos.x,
+              background: "#0d0d0d",
+              border: "2px solid #f1c40f",
+              borderRadius: "8px",
+              padding: "0.4rem",
+              display: "flex",
+              gap: "0.35rem",
+            },
+            onClick: (ev) => ev.stopPropagation(),
+          },
+          e(
+            "button",
+            {
+              className: "icon-button",
+              title: "Rename tab",
+              onClick: () => {
+                const tab = tabs.find((t) => t.id === tabMenuTargetId);
+                setTabMenuTargetId(null);
+                if (tab) beginRenameTab(tab);
+              },
+            },
+            e("i", { className: "ph-bold ph-pencil-simple" })
+          ),
+          e(
+            "button",
+            {
+              className: "icon-button",
+              title: "Delete tab",
+              onClick: () => deleteTab(tabMenuTargetId),
+            },
+            e("i", { className: "ph-bold ph-trash" })
+          )
+        )
+      ),
     e(
       "div",
       { className: "footer" },

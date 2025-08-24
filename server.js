@@ -91,6 +91,12 @@ app.post("/api/register", async (req, res) => {
       "INSERT INTO users(username,password) VALUES($1,$2) RETURNING id,username",
       [username, hashed]
     );
+
+    await pool.query(
+      "INSERT INTO tabs(name,user_id,position) VALUES($1,$2,1)",
+      ["Inbox", rows[0].id]
+    );
+
     return res.json({ token: generateToken(rows[0]) });
   } catch (err) {
     if (err.code === "23505")
@@ -135,6 +141,10 @@ app.post("/api/google-login", async (req, res) => {
         [email, googleId]
       );
       user = result.rows[0];
+      await pool.query(
+        "INSERT INTO tabs(name,user_id,position) VALUES($1,$2,1)",
+        ["Inbox", user.id]
+      );
     }
     res.json({ token: generateToken(user) });
   } catch {
@@ -152,7 +162,7 @@ app.get("/api/me", auth, async (req, res) => {
 
 app.get("/api/tabs", auth, async (req, res) => {
   const { rows } = await pool.query(
-    "SELECT id, name FROM tabs WHERE user_id=$1 ORDER BY id ASC",
+    "SELECT id, name, position FROM tabs WHERE user_id=$1 ORDER BY position ASC, id ASC",
     [req.user.id]
   );
   res.json(rows);
@@ -163,14 +173,43 @@ app.post("/api/tabs", auth, async (req, res) => {
   if (!name || !name.trim())
     return res.status(400).json({ error: "name required" });
   try {
+    const { rows: posRows } = await pool.query(
+      "SELECT COALESCE(MAX(position),0)+1 AS next FROM tabs WHERE user_id=$1",
+      [req.user.id]
+    );
+    const nextPosition = posRows[0].next;
     const { rows } = await pool.query(
-      "INSERT INTO tabs(name,user_id) VALUES($1,$2) RETURNING id,name",
-      [name.trim(), req.user.id]
+      "INSERT INTO tabs(name,user_id,position) VALUES($1,$2,$3) RETURNING id,name,position",
+      [name.trim(), req.user.id, nextPosition]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === "23505")
       return res.status(400).json({ error: "tab exists" });
+    res.status(500).end();
+  }
+});
+
+app.post("/api/tabs/reorder", auth, async (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0)
+    return res.status(400).json({ error: "orderedIds required" });
+  await pool.query("BEGIN");
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await pool.query(
+        "UPDATE tabs SET position=$1 WHERE id=$2 AND user_id=$3",
+        [i + 1, orderedIds[i], req.user.id]
+      );
+    }
+    await pool.query("COMMIT");
+    const { rows } = await pool.query(
+      "SELECT id, name, position FROM tabs WHERE user_id=$1 ORDER BY position ASC, id ASC",
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    await pool.query("ROLLBACK");
     res.status(500).end();
   }
 });
@@ -220,7 +259,7 @@ app.get("/api/tasks", auth, async (req, res) => {
 
 async function getDefaultTabId(userId) {
   const { rows } = await pool.query(
-    "SELECT id FROM tabs WHERE user_id=$1 ORDER BY id ASC LIMIT 1",
+    "SELECT id FROM tabs WHERE user_id=$1 ORDER BY position ASC, id ASC LIMIT 1",
     [userId]
   );
   return rows[0]?.id || null;
