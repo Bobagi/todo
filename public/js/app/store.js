@@ -1,5 +1,5 @@
+import { fakeGrant, myEntitlements, openCheckout } from "./api.js";
 import { e, fmtMoney, getExpiryDateString } from "./utils.js";
-import { openCheckout, fakeGrant, myEntitlements } from "./api.js";
 
 export function StoreModal({
   token,
@@ -116,8 +116,20 @@ export function StoreModal({
         e(
           "button",
           {
-            onClick: () => setStoreOpen(false),
+            onClick: () => {
+              // abre About pelo próprio modal de Upgrades
+              window.dispatchEvent(new CustomEvent("open-about-modal"));
+            },
+            className: "icon-button",
             style: { marginLeft: "auto" },
+            title: "Sobre o app",
+          },
+          e("i", { className: "ph-bold ph-info" })
+        ),
+        e(
+          "button",
+          {
+            onClick: () => setStoreOpen(false),
             className: "icon-button",
             title: "Close",
           },
@@ -363,6 +375,16 @@ export function UpgradesModal({ token, open, setOpen }) {
   const [list, setList] = React.useState([]);
 
   React.useEffect(() => {
+    function openAbout() {
+      setOpen(false);
+      // sinaliza para o App abrir o modal About
+      window.dispatchEvent(new CustomEvent("open-about-modal"));
+    }
+    window.addEventListener("open-about-modal", openAbout);
+    return () => window.removeEventListener("open-about-modal", openAbout);
+  }, [setOpen]);
+
+  React.useEffect(() => {
     if (!open) return;
     (async () => {
       const data = await myEntitlements(token).catch(() => []);
@@ -401,14 +423,27 @@ export function UpgradesModal({ token, open, setOpen }) {
       },
       e(
         "div",
-        { style: { display: "flex", alignItems: "center" } },
+        { style: { display: "flex", alignItems: "center", gap: 8 } },
         e("h3", { style: { margin: 0 } }, "Meus Upgrades"),
+        e(
+          "button",
+          {
+            className: "icon-button",
+            title: "Sobre o app",
+            onClick: () => {
+              setOpen(false);
+              window.dispatchEvent(new CustomEvent("open-about-modal"));
+            },
+          },
+          e("i", { className: "ph-bold ph-info" })
+        ),
         e(
           "button",
           {
             className: "icon-button",
             style: { marginLeft: "auto" },
             onClick: () => setOpen(false),
+            title: "Fechar",
           },
           e("i", { className: "ph-bold ph-x" })
         )

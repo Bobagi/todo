@@ -35,20 +35,3 @@ BEGIN
     ALTER TABLE tasks ADD CONSTRAINT tasks_tab_id_fkey FOREIGN KEY (tab_id) REFERENCES tabs(id) ON DELETE CASCADE;
   END IF;
 END $$;
-
-INSERT INTO tabs(name, user_id)
-SELECT 'General', u.id
-FROM users u
-WHERE NOT EXISTS (
-  SELECT 1 FROM tabs t WHERE t.user_id = u.id AND LOWER(t.name) = 'general'
-);
-
-WITH j AS (
-  SELECT u.id AS user_id, t.id AS general_tab_id
-  FROM users u
-  JOIN tabs t ON t.user_id = u.id AND LOWER(t.name) = 'general'
-)
-UPDATE tasks tk
-SET tab_id = j.general_tab_id
-FROM j
-WHERE tk.user_id = j.user_id AND tk.tab_id IS NULL;

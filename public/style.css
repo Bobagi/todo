@@ -49,7 +49,8 @@ button {
   font-weight: bold;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out,
+    filter 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
 button:hover {
@@ -110,8 +111,7 @@ input[type="checkbox"] {
 }
 
 .tabs-track {
-  /* deixa scroller só quando realmente precisa */
-  overflow-y: hidden; /* <- remove barra vertical indesejada */
+  overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: #f1c40f #0d0d0d;
 }
@@ -119,11 +119,9 @@ input[type="checkbox"] {
 .tabs-track::-webkit-scrollbar {
   height: 6px;
 }
-
 .tabs-track::-webkit-scrollbar-track {
   background: #0d0d0d;
 }
-
 .tabs-track::-webkit-scrollbar-thumb {
   background: #f1c40f;
   border-radius: 4px;
@@ -160,6 +158,7 @@ input[type="checkbox"] {
   opacity: 1;
 }
 
+/* Botões icônicos */
 .icon-button {
   width: 40px;
   height: 40px;
@@ -172,7 +171,74 @@ input[type="checkbox"] {
   border-radius: 6px;
   cursor: pointer;
 }
-
 .icon-button:hover {
   filter: brightness(1.05);
+}
+
+/* Variante invertida (logout) */
+.icon-button--inverted {
+  background: transparent;
+  color: #f1c40f;
+  border: 2px solid #f1c40f;
+}
+.icon-button--inverted:hover {
+  background: #f1c40f;
+  color: #000;
+  border-color: #f1c40f;
+}
+
+/* About key/value list */
+.about-kv {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+.about-kv .k {
+  color: #f1c40fcc;
+  text-align: right;
+  padding-right: 6px;
+}
+.about-kv .v {
+  color: #fff;
+}
+
+/* Password strength meter */
+.pw-meter {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 6px 0 6px;
+  width: 100%;
+}
+.pw-meter span {
+  height: 10px;
+  border-radius: 999px;
+  background: #2a2a2a;
+  box-shadow: inset 0 0 0 1px #000;
+  opacity: 0.5;
+}
+.pw-meter span.on:nth-child(1) {
+  background: #ff4d4f;
+  opacity: 1;
+}
+.pw-meter span.on:nth-child(2) {
+  background: #f1c40f;
+  opacity: 1;
+}
+.pw-meter span.on:nth-child(3) {
+  background: #2ecc71;
+  opacity: 1;
+}
+
+/* Hint abaixo do medidor */
+.pw-hint {
+  margin-top: -2px;
+  margin-bottom: 0.5rem;
+  font-size: 12px;
+  color: #fff;
+  opacity: 0.9;
+}
+.pw-hint b {
+  color: #ffd700;
 }

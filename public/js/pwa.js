@@ -1,3 +1,9 @@
+// Versões exibidas no About
+const APP_VERSION = "0.1.0";
+const SW_VERSION = "v6";
+window.__APP_VERSION__ = APP_VERSION;
+window.__SW_VERSION__ = SW_VERSION;
+
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 
@@ -19,7 +25,7 @@ installBtn?.addEventListener("click", async () => {
   await deferredPrompt.prompt();
   await deferredPrompt.userChoice;
   deferredPrompt = null;
-  installBtn.style.display = "none";
+  if (installBtn) installBtn.style.display = "none";
 });
 
 // SW refresh

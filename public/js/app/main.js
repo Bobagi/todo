@@ -1,4 +1,5 @@
 // public/js/app/main.js
+import { AboutModal } from "./about.js";
 import {
   addTask as apiAddTask,
   createTab as apiCreateTab,
@@ -20,7 +21,9 @@ import {
   e,
   getExpiryDateString,
   handleGlowMove,
+  passwordStrength,
   TAB_NAME_MAX,
+  validateUsername,
 } from "./utils.js";
 
 function App() {
@@ -33,6 +36,7 @@ function App() {
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [token, setToken] = React.useState(localStorage.getItem("token"));
   const [isRegister, setIsRegister] = React.useState(false);
+  const [acceptLegal, setAcceptLegal] = React.useState(false);
   const [editingTaskId, setEditingTaskId] = React.useState(null);
   const [editingTitle, setEditingTitle] = React.useState("");
 
@@ -40,21 +44,29 @@ function App() {
 
   // Loja
   const [storeOpen, setStoreOpen] = React.useState(false);
-  const [storeFocus, setStoreFocus] = React.useState(null); // 'TASK_PACK' | 'TAB_SLOT' | null
+  const [storeFocus, setStoreFocus] = React.useState(null);
   const [storeTaskPackTabId, setStoreTaskPackTabId] = React.useState(null);
-  const [storeReason, setStoreReason] = React.useState("MANUAL"); // MANUAL | TASK_LIMIT | TAB_LIMIT
+  const [storeReason, setStoreReason] = React.useState("MANUAL");
 
   // Upgrades
   const [upgOpen, setUpgOpen] = React.useState(false);
 
+  // About
+  const [aboutOpen, setAboutOpen] = React.useState(false);
+  React.useEffect(() => {
+    const open = () => setAboutOpen(true);
+    window.addEventListener("open-about-modal", open);
+    return () => window.removeEventListener("open-about-modal", open);
+  }, []);
+
   // Auth refs
   const usernameRef = React.useRef(null);
 
-  // ---- MENU DE LONG-PRESS DAS ABAS ----
+  // Long-press menu das abas
   const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
   const [tabMenuPos, setTabMenuPos] = React.useState({ x: 0, y: 0 });
 
-  // ---- DnD das ABAS (com long-press) ----
+  // DnD Abas (com long-press)
   const { isDraggingTabs, draggingTabId, setTabRef, handleTabPointerDown } =
     useDragTabs(
       tabs,
@@ -74,7 +86,7 @@ function App() {
       }
     );
 
-  // ---- DnD das TAREFAS ----
+  // DnD Tasks
   const { isDraggingTasks, draggingTaskId, setTaskRef, handleTaskPointerDown } =
     useDragTasks(tasks, setTasks, async (ordered) => {
       if (!selectedTabId) return;
@@ -86,7 +98,7 @@ function App() {
       setTasks(Array.isArray(data) ? data : tasks);
     });
 
-  // ---- API helpers ----
+  // API helpers
   const loadBilling = async () =>
     setBillingCfg(await fetchBillingConfig(token));
 
@@ -115,7 +127,7 @@ function App() {
     setTasks(Array.isArray(list) ? list : []);
   };
 
-  // ---- efeitos ----
+  // efeitos
   React.useEffect(() => {
     if (!token) return;
     loadBilling();
@@ -132,7 +144,7 @@ function App() {
       setTimeout(() => usernameRef.current?.focus(), 0);
   }, [token, isRegister]);
 
-  // retorno do Stripe Checkout
+  // retorno checkout
   React.useEffect(() => {
     if (!token) return;
     const url = new URL(window.location.href);
@@ -149,7 +161,7 @@ function App() {
     }
   }, [token]);
 
-  // ---- ações ----
+  // ações
   async function createTab() {
     const cap = await capacity(token).catch(() => ({ canCreate: true }));
     if (!cap.canCreate) {
@@ -243,10 +255,37 @@ function App() {
 
   async function handleAuth() {
     const endpoint = isRegister ? "/api/register" : "/api/login";
+
+    if (isRegister) {
+      if (!validateUsername(username)) {
+        alert("Username: 3–30 chars, letras/números/_");
+        return;
+      }
+      const s = passwordStrength(password);
+      if (!s.ok) {
+        alert(
+          "Senha fraca: precisa de maiúscula, minúscula, número e símbolo (min 8)."
+        );
+        return;
+      }
+      if (password !== confirmPassword) {
+        alert("As senhas não conferem.");
+        return;
+      }
+      if (!acceptLegal) {
+        alert("É necessário aceitar os Termos e a Privacidade.");
+        return;
+      }
+    }
+
+    const body = isRegister
+      ? { username, password, acceptLegal: true }
+      : { username, password };
+
     const r = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify(body),
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok) {
@@ -254,6 +293,8 @@ function App() {
       setToken(d.token);
       setUsername("");
       setPassword("");
+      setConfirmPassword(""); // limpa confirmação
+      setAcceptLegal(false);
     } else alert(d.error || "Auth error");
   }
 
@@ -277,11 +318,23 @@ function App() {
     setTasks([]);
     setTabs([]);
     setSelectedTabId(null);
+    setIsRegister(false); // volta para Login
+    setPassword("");
+    setConfirmPassword("");
   }
 
   const billingExpiry = getExpiryDateString(billingCfg);
+  const passInfo = passwordStrength(password);
+  const segCount =
+    passInfo.score >= 4
+      ? 3
+      : passInfo.score >= 2
+      ? 2
+      : passInfo.score >= 1
+      ? 1
+      : 0;
 
-  // ---- RENDER ----
+  // RENDER
   if (!token) {
     return e(
       "div",
@@ -301,7 +354,7 @@ function App() {
       }),
       e("input", {
         type: "password",
-        maxLength: 50,
+        maxLength: 72,
         placeholder: "Password",
         autoComplete: isRegister ? "new-password" : "current-password",
         value: password,
@@ -311,6 +364,22 @@ function App() {
         },
         className: "auth-input",
       }),
+      isRegister &&
+        e(
+          "div",
+          { className: "pw-meter" },
+          e("span", { className: segCount >= 1 ? "on" : "" }),
+          e("span", { className: segCount >= 2 ? "on" : "" }),
+          e("span", { className: segCount >= 3 ? "on" : "" })
+        ),
+      isRegister &&
+        e(
+          "div",
+          { className: "pw-hint" },
+          "Strength: ",
+          e("b", null, passInfo.label),
+          passInfo.ok ? "" : ` — missing: ${passInfo.reasons.join(", ")}`
+        ),
       isRegister &&
         e("input", {
           type: "password",
@@ -322,6 +391,32 @@ function App() {
           },
           className: "auth-input",
         }),
+      isRegister &&
+        e(
+          "label",
+          { style: { display: "flex", gap: 8, fontSize: 13, marginBottom: 8 } },
+          e("input", {
+            type: "checkbox",
+            checked: acceptLegal,
+            onChange: (e2) => setAcceptLegal(e2.target.checked),
+          }),
+          e(
+            "span",
+            null,
+            "I agree to the ",
+            e(
+              "a",
+              { href: "/legal/terms.html", target: "_blank" },
+              "Terms of Use"
+            ),
+            " and ",
+            e(
+              "a",
+              { href: "/legal/privacy.html", target: "_blank" },
+              "Privacy Policy"
+            )
+          )
+        ),
       e(
         "button",
         { onClick: handleAuth, className: "auth-button" },
@@ -399,11 +494,16 @@ function App() {
       ),
       e(
         "button",
-        { onClick: logout, className: "icon-button", title: "Logout" },
+        {
+          onClick: logout,
+          className: "icon-button icon-button--inverted",
+          title: "Logout",
+        },
         e("i", { className: "ph-bold ph-sign-out" })
       )
     ),
 
+    /* ... (resto permanece igual: abas, menu long-press, add task e lista) ... */
     // tabs
     e(
       "div",
@@ -611,7 +711,7 @@ function App() {
             },
             title: "Drag to reorder",
           },
-          // checkbox
+          // checkbox neon
           e(
             "div",
             { style: { display: "flex", justifyContent: "center" } },
@@ -666,7 +766,7 @@ function App() {
               ])
             )
           ),
-          // título / edição inline
+          // título/edição
           e(
             "div",
             {
@@ -798,7 +898,8 @@ function App() {
         await fetchTasks();
       },
     }),
-    e(UpgradesModal, { token, open: upgOpen, setOpen: setUpgOpen })
+    e(UpgradesModal, { token, open: upgOpen, setOpen: setUpgOpen }),
+    e(AboutModal, { open: aboutOpen, setOpen: setAboutOpen, billingCfg })
   );
 }
 
