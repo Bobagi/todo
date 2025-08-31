@@ -7,7 +7,7 @@ def collect_source_file_paths(root_directory: Path, allowed_extensions: set[str]
         directory_names[:] = [d for d in directory_names if d not in ignored_directory_names]
         for file_name in file_names:
             file_path = Path(current_root) / file_name
-            if file_path.suffix.lower() in allowed_extensions:
+            if file_path.suffix.lower() in allowed_extensions or file_path.name == "schema.prisma":
                 collected_paths.append(file_path)
     collected_paths.sort(key=lambda p: p.as_posix())
     return collected_paths
