@@ -32,6 +32,11 @@ WEB_PORT=3051
 
 ## 🔗 Access
 
+- docker compose up --build
+```bash
+stripe login
+stripe listen --forward-to http://localhost:3051/api/billing/webhook
+```
 - On desktop: http://localhost:3051  
 - On VPS: make sure Nginx proxies to `localhost:${WEB_PORT}` over HTTPS  
 - On Codespaces/Gitpod: check web container logs for exposed URL

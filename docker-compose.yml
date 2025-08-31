@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   web:
     build: .
@@ -24,7 +22,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    entrypoint: [""]
+    entrypoint: [""] # <— importantíssimo: NÃO roda o docker-entrypoint.sh aqui
     command: sh -c "npx prisma generate && npx prisma studio --port 5555 --hostname 0.0.0.0 --browser none"
     ports:
       - "${PRISMA_STUDIO_PORT:-5555}:5555"

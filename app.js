@@ -1,5 +1,7 @@
 const e = React.createElement;
 
+const TAB_NAME_MAX = 30; // limite de caracteres para nome de aba
+
 function App() {
   const [tasks, setTasks] = React.useState([]);
   const [tabs, setTabs] = React.useState([]);
@@ -13,8 +15,11 @@ function App() {
   const [editingTaskId, setEditingTaskId] = React.useState(null);
   const [editingTitle, setEditingTitle] = React.useState("");
 
+  const [billingCfg, setBillingCfg] = React.useState(null);
+
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
+  // drag state
   const [isDraggingTabs, setIsDraggingTabs] = React.useState(false);
   const [draggingTabId, setDraggingTabId] = React.useState(null);
   const tabElementRefs = React.useRef({});
@@ -26,6 +31,7 @@ function App() {
   const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
   const [tabMenuPos, setTabMenuPos] = React.useState({ x: 0, y: 0 });
 
+  // animação FLIP
   const setTabRef = (id) => (el) => {
     tabElementRefs.current[id] = el;
   };
@@ -53,36 +59,55 @@ function App() {
     });
   };
 
-  const submitTabOrder = async (newTabs) => {
-    const orderedIds = newTabs.map((t) => t.id);
-    const res = await fetch("/api/tabs/reorder", {
+  // monetização
+  async function openCheckout(actionType, tabId) {
+    const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ orderedIds }),
+      body: JSON.stringify({ actionType, tabId }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      setTabs(data);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Payment error");
+      return;
     }
-  };
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
+  }
 
+  // rename
   const beginRenameTab = async (tab) => {
-    const newName = prompt("Rename tab", tab.name);
-    if (!newName || newName.trim() === tab.name) return;
+    const current = tab.name || "";
+    const newName = prompt(`Rename tab (max ${TAB_NAME_MAX} chars)`, current);
+    if (!newName) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === current) return;
+    if (trimmed.length > TAB_NAME_MAX) {
+      alert(`Tab name must be up to ${TAB_NAME_MAX} characters.`);
+      return;
+    }
     const res = await fetch(`/api/tabs/${tab.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ name: newName.trim() }),
+      body: JSON.stringify({ name: trimmed }),
     });
     if (res.ok) fetchTabs();
+    else {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Rename failed");
+    }
   };
 
+  // drag handlers
   const handleTabPointerDown = (tab, e) => {
     const px = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
     const py = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
     pointerStartRef.current = { x: px, y: py };
     clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
+      // abre menu
       const el = tabElementRefs.current[tab.id];
       const r = el?.getBoundingClientRect();
       setTabMenuTargetId(tab.id);
@@ -148,6 +173,19 @@ function App() {
     }
   };
 
+  const submitTabOrder = async (newTabs) => {
+    const orderedIds = newTabs.map((t) => t.id);
+    const res = await fetch("/api/tabs/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ orderedIds }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setTabs(data);
+    }
+  };
+
   const handleTabPointerUp = async () => {
     clearTimeout(longPressTimerRef.current);
     window.removeEventListener("pointermove", handleTabPointerMove);
@@ -161,15 +199,21 @@ function App() {
     setDraggingTabId(null);
   };
 
-  const handleTabDoubleClick = (tab) => {
-    beginRenameTab(tab);
-  };
+  const handleTabDoubleClick = (tab) => beginRenameTab(tab);
 
   const handleGlowMove = (e) => {
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
     el.style.setProperty("--mx", `${e.clientX - r.left}px`);
     el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  };
+
+  // API
+  const fetchBillingConfig = async () => {
+    try {
+      const res = await fetch("/api/billing/config", { headers: authHeaders });
+      if (res.ok) setBillingCfg(await res.json());
+    } catch {}
   };
 
   const fetchTabs = async () => {
@@ -202,6 +246,7 @@ function App() {
 
   React.useEffect(() => {
     if (!token) return;
+    fetchBillingConfig();
     fetchTabs();
   }, [token]);
 
@@ -217,10 +262,15 @@ function App() {
   const deleteTab = async (tabId) => {
     const ok = confirm("Delete this tab and all its tasks?");
     if (!ok) return;
-    await fetch(`/api/tabs/${tabId}`, {
+    const res = await fetch(`/api/tabs/${tabId}`, {
       method: "DELETE",
       headers: authHeaders,
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Could not delete tab.");
+      return;
+    }
     if (selectedTabId === tabId) setSelectedTabId(null);
     setTabMenuTargetId(null);
     await fetchTabs();
@@ -228,11 +278,19 @@ function App() {
 
   const addTask = async () => {
     if (!title.trim()) return;
-    await fetch("/api/tasks", {
+    const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ title, tabId: selectedTabId }),
     });
+    if (res.status === 402) {
+      const n = billingCfg?.task_pack_size ?? 6;
+      const go = confirm(
+        `Task limit reached for this tab. Buy +${n} tasks (30 days)?`
+      );
+      if (go) await openCheckout("TASK_PACK", selectedTabId);
+      return;
+    }
     setTitle("");
     fetchTasks();
   };
@@ -302,13 +360,20 @@ function App() {
   };
 
   const createTab = async () => {
-    const newTabName = prompt("New tab name");
+    let newTabName = prompt(`New tab name (max ${TAB_NAME_MAX} chars)`);
+    if (!newTabName) return;
+    newTabName = newTabName.trim().slice(0, TAB_NAME_MAX);
     if (!newTabName) return;
     const res = await fetch("/api/tabs", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ name: newTabName }),
     });
+    if (res.status === 402) {
+      const go = confirm("Tab limit reached. Buy an additional tab (30 days)?");
+      if (go) await openCheckout("TAB_SLOT");
+      return;
+    }
     if (res.ok) {
       await fetchTabs();
     } else {
@@ -316,6 +381,39 @@ function App() {
       alert(data.error || "Error creating tab");
     }
   };
+
+  // --- PWA: força atualização imediata ---
+  React.useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js").then((reg) => {
+        // força update check
+        reg.update();
+
+        // puxa o SW novo imediatamente
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (
+                newWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                newWorker.postMessage({ type: "SKIP_WAITING" });
+              }
+            });
+          }
+        });
+      });
+
+      // recarrega quando o novo SW assume o controle
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        window.location.reload();
+      });
+    }
+  }, []);
 
   if (!token) {
     return e(
@@ -477,7 +575,30 @@ function App() {
         "button",
         {
           className: "new-tab-button",
-          onClick: createTab,
+          onClick: async () => {
+            // tenta criar, se bater limite, oferece compra
+            let newTabName = prompt(`New tab name (max ${TAB_NAME_MAX} chars)`);
+            if (!newTabName) return;
+            newTabName = newTabName.trim().slice(0, TAB_NAME_MAX);
+            if (!newTabName) return;
+            const res = await fetch("/api/tabs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...authHeaders },
+              body: JSON.stringify({ name: newTabName }),
+            });
+            if (res.status === 402) {
+              const go = confirm(
+                "Tab limit reached. Buy an additional tab (30 days)?"
+              );
+              if (go) await openCheckout("TAB_SLOT");
+              return;
+            }
+            if (res.ok) await fetchTabs();
+            else {
+              const d = await res.json().catch(() => ({}));
+              alert(d.error || "Error creating tab");
+            }
+          },
           onMouseMove: handleGlowMove,
           style: {
             flex: "0 0 auto",
@@ -540,6 +661,18 @@ function App() {
               onClick: () => deleteTab(tabMenuTargetId),
             },
             e("i", { className: "ph-bold ph-trash" })
+          ),
+          e(
+            "button",
+            {
+              className: "icon-button",
+              title: `Buy +${billingCfg?.task_pack_size ?? 6} tasks`,
+              onClick: () => {
+                openCheckout("TASK_PACK", tabMenuTargetId);
+                setTabMenuTargetId(null);
+              },
+            },
+            e("i", { className: "ph-bold ph-plus-circle" })
           )
         )
       ),
@@ -759,16 +892,16 @@ let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
 
 if (window.matchMedia("(display-mode: standalone)").matches) {
-  installBtn.style.display = "none";
+  if (installBtn) installBtn.style.display = "none";
 }
 
 window.addEventListener("beforeinstallprompt", (e) => {
   deferredPrompt = e;
-  installBtn.style.display = "inline-block";
+  if (installBtn) installBtn.style.display = "inline-block";
 });
 
 window.addEventListener("appinstalled", () => {
-  installBtn.style.display = "none";
+  if (installBtn) installBtn.style.display = "none";
 });
 
 installBtn?.addEventListener("click", async () => {
