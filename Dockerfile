@@ -2,24 +2,24 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# ferramentas que precisamos no entrypoint
+# Ferramentas usadas no entrypoint
 RUN apk add --no-cache openssl postgresql-client
 
 # deps
 COPY package*.json ./
 RUN npm install && npm install prisma @prisma/client stripe
 
-# prisma client
+# prisma
 COPY prisma ./prisma
 RUN npx prisma generate || true
 
-# código da app
+# código da app (inclui public/, server.js e /server/**)
 COPY . .
 
-# garante que o front referencie o app.js certo
-RUN cp app.js public/
+# (REMOVIDO) não existe mais app.js na raiz para copiar
+# RUN cp app.js public/
 
-# script de boot
+# entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

@@ -20,14 +20,21 @@
     <link rel="apple-touch-icon" href="icon.png" />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="neon-checkbox.css" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#FFD700">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- React/ReactDOM (como você já usa) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="app.js"></script>
+    <link rel="stylesheet" href="/neon-checkbox.css" />
+    <link rel="stylesheet" href="/style.css" />
+
+    <!-- novo ponto de entrada em módulos ES -->
+    <script type="module" src="/js/app/main.js"></script>
+    <script type="module" src="/js/pwa.js"></script>
+
     <script>
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/service-worker.js");

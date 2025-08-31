@@ -1,16 +1,20 @@
-// Estratégia: network-first para HTML/JS (pega versão nova), stale-while-revalidate p/ assets.
-// Força ativação imediata + auto reload do app (cooperando com app.js).
+// public/service-worker.js
+// Estratégia: network-first para HTML e qualquer JS em /js/.
+// Stale-while-revalidate para demais assets.
+// Força ativação imediata + coopera com pwa.js para SKIP_WAITING.
 
-const VERSION = "v5"; // bumpa quando quiser forçar update
+const VERSION = "v6"; // bump quando quiser forçar update
 const CACHE_NAME = "todo-cache-" + VERSION;
 
 const CORE_URLS = [
-  "/", // HTML SPA
+  "/", // SPA
   "/index.html",
-  "/app.js",
   "/manifest.json",
+  "/style.css",
+  "/neon-checkbox.css",
   "/icon.png",
-  "/favicon.ico",
+  "/icon_black.png",
+  // (deixe os .js de fora: trataremos via network-first dinamicamente)
 ];
 
 self.addEventListener("install", (event) => {
@@ -35,9 +39,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 function isHtml(request) {
@@ -46,25 +48,26 @@ function isHtml(request) {
     (request.headers.get("accept") || "").includes("text/html")
   );
 }
-function isCoreJs(request) {
+function isAppScript(request) {
   const url = new URL(request.url);
-  return url.pathname === "/app.js";
+  // qualquer JS da app
+  return request.destination === "script" || url.pathname.startsWith("/js/");
 }
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // 🚫 Não intercepta API (evita cache indevido e 401/HTML entrando no app)
+  // Não intercepta API
   if (url.pathname.startsWith("/api/")) return;
 
-  // Network-first para HTML e app.js
-  if (isHtml(req) || isCoreJs(req)) {
+  // Network-first para HTML e scripts da app
+  if (isHtml(req) || isAppScript(req)) {
     event.respondWith(
       (async () => {
         try {
           const fresh = await fetch(req, { cache: "no-store" });
-          if (fresh.ok) {
+          if (fresh && fresh.ok) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(req, fresh.clone());
           }
@@ -79,13 +82,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Stale-While-Revalidate para o resto
+  // Stale-While-Revalidate para restantes
   event.respondWith(
     (async () => {
       const cached = await caches.match(req);
       const fetchPromise = fetch(req)
         .then((resp) => {
-          if (resp.ok) {
+          if (resp && resp.ok) {
             const clone = resp.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           }
