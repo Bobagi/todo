@@ -1,7 +1,7 @@
 // Estratégia: network-first para HTML/JS (pega versão nova), stale-while-revalidate p/ assets.
 // Força ativação imediata + auto reload do app (cooperando com app.js).
 
-const VERSION = "v4"; // bumpa quando quiser forçar update
+const VERSION = "v5"; // bumpa quando quiser forçar update
 const CACHE_NAME = "todo-cache-" + VERSION;
 
 const CORE_URLS = [
@@ -14,7 +14,7 @@ const CORE_URLS = [
 ];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting(); // toma controle imediatamente
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_URLS))
   );
@@ -23,19 +23,17 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      // limpa caches antigos
       const names = await caches.keys();
       await Promise.all(
         names
           .filter((n) => n.startsWith("todo-cache-") && n !== CACHE_NAME)
           .map((n) => caches.delete(n))
       );
-      await self.clients.claim(); // controla todos os clients já abertos
+      await self.clients.claim();
     })()
   );
 });
 
-// recebe pedido do app pra pular waiting (fallback)
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
@@ -55,15 +53,21 @@ function isCoreJs(request) {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+  const url = new URL(req.url);
 
-  // Network-first para HTML e app.js (garante versão nova)
+  // 🚫 Não intercepta API (evita cache indevido e 401/HTML entrando no app)
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Network-first para HTML e app.js
   if (isHtml(req) || isCoreJs(req)) {
     event.respondWith(
       (async () => {
         try {
           const fresh = await fetch(req, { cache: "no-store" });
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(req, fresh.clone());
+          if (fresh.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(req, fresh.clone());
+          }
           return fresh;
         } catch (err) {
           const cached = await caches.match(req);
@@ -81,8 +85,10 @@ self.addEventListener("fetch", (event) => {
       const cached = await caches.match(req);
       const fetchPromise = fetch(req)
         .then((resp) => {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
           return resp;
         })
         .catch(() => null);

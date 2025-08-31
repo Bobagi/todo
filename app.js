@@ -1,6 +1,5 @@
 const e = React.createElement;
-
-const TAB_NAME_MAX = 30; // limite de caracteres para nome de aba
+const TAB_NAME_MAX = 30;
 
 function App() {
   const [tasks, setTasks] = React.useState([]);
@@ -17,6 +16,12 @@ function App() {
 
   const [billingCfg, setBillingCfg] = React.useState(null);
 
+  // Loja
+  const [storeOpen, setStoreOpen] = React.useState(false);
+  const [storeFocus, setStoreFocus] = React.useState(null); // 'TASK_PACK' | 'TAB_SLOT' | null
+  const [storeTaskPackTabId, setStoreTaskPackTabId] = React.useState(null);
+  const [storeReason, setStoreReason] = React.useState("MANUAL"); // MANUAL | TASK_LIMIT | TAB_LIMIT
+
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
   // drag state
@@ -31,11 +36,13 @@ function App() {
   const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
   const [tabMenuPos, setTabMenuPos] = React.useState({ x: 0, y: 0 });
 
-  // animação FLIP
+  // foco no login
+  const usernameRef = React.useRef(null);
+
+  // FLIP
   const setTabRef = (id) => (el) => {
     tabElementRefs.current[id] = el;
   };
-
   const runFlip = (beforeLeftById) => {
     requestAnimationFrame(() => {
       Object.keys(beforeLeftById).forEach((id) => {
@@ -59,7 +66,7 @@ function App() {
     });
   };
 
-  // monetização
+  // Stripe
   async function openCheckout(actionType, tabId) {
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
@@ -71,10 +78,23 @@ function App() {
       alert(d.error || "Payment error");
       return;
     }
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
+    const data = await res.json().catch(() => ({}));
+    if (data.url) window.location.href = data.url;
+  }
+  async function fakeGrant(actionType, tabId) {
+    const res = await fetch("/api/billing/fake-grant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ actionType, tabId }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(d.error || "Not allowed");
+      return;
     }
+    // fecha loja e recarrega limites/abas
+    setStoreOpen(false);
+    await fetchTabs();
   }
 
   // rename
@@ -101,13 +121,12 @@ function App() {
   };
 
   // drag handlers
-  const handleTabPointerDown = (tab, e) => {
-    const px = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
-    const py = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+  const handleTabPointerDown = (tab, ev) => {
+    const px = ev.clientX ?? ev.touches?.[0]?.clientX ?? 0;
+    const py = ev.clientY ?? ev.touches?.[0]?.clientY ?? 0;
     pointerStartRef.current = { x: px, y: py };
     clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
-      // abre menu
       const el = tabElementRefs.current[tab.id];
       const r = el?.getBoundingClientRect();
       setTabMenuTargetId(tab.id);
@@ -124,10 +143,9 @@ function App() {
     window.addEventListener("pointermove", handleTabPointerMove);
     window.addEventListener("pointerup", handleTabPointerUp);
   };
-
   const handleTabPointerMove = (e) => {
-    const mx = e.clientX;
-    const my = e.clientY;
+    const mx = e.clientX,
+      my = e.clientY;
     const dx = Math.abs(mx - pointerStartRef.current.x);
     const dy = Math.abs(my - pointerStartRef.current.y);
     if (dx > 8 || dy > 8) clearTimeout(longPressTimerRef.current);
@@ -135,9 +153,7 @@ function App() {
       if (dx > 6 || dy > 6) {
         isDraggingTabsRef.current = true;
         setIsDraggingTabs(true);
-      } else {
-        return;
-      }
+      } else return;
     }
     const currentTabs = tabsRef.current;
     const currentId = draggingTabIdRef.current;
@@ -172,7 +188,6 @@ function App() {
       runFlip(beforeLeftById);
     }
   };
-
   const submitTabOrder = async (newTabs) => {
     const orderedIds = newTabs.map((t) => t.id);
     const res = await fetch("/api/tabs/reorder", {
@@ -181,11 +196,10 @@ function App() {
       body: JSON.stringify({ orderedIds }),
     });
     if (res.ok) {
-      const data = await res.json();
-      setTabs(data);
+      const data = await res.json().catch(() => []);
+      setTabs(Array.isArray(data) ? data : []);
     }
   };
-
   const handleTabPointerUp = async () => {
     clearTimeout(longPressTimerRef.current);
     window.removeEventListener("pointermove", handleTabPointerMove);
@@ -199,8 +213,6 @@ function App() {
     setDraggingTabId(null);
   };
 
-  const handleTabDoubleClick = (tab) => beginRenameTab(tab);
-
   const handleGlowMove = (e) => {
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
@@ -212,10 +224,9 @@ function App() {
   const fetchBillingConfig = async () => {
     try {
       const res = await fetch("/api/billing/config", { headers: authHeaders });
-      if (res.ok) setBillingCfg(await res.json());
+      if (res.ok) setBillingCfg(await res.json().catch(() => null));
     } catch {}
   };
-
   const fetchTabs = async () => {
     if (!token) return;
     const res = await fetch("/api/tabs", { headers: authHeaders });
@@ -224,11 +235,11 @@ function App() {
       localStorage.removeItem("token");
       return;
     }
-    const data = await res.json();
-    setTabs(data);
-    if (!selectedTabId && data.length) setSelectedTabId(data[0].id);
+    const data = await res.json().catch(() => []);
+    const list = Array.isArray(data) ? data : [];
+    setTabs(list);
+    if (!selectedTabId && list.length) setSelectedTabId(list[0].id);
   };
-
   const fetchTasks = async () => {
     if (!token) return;
     const queryString = selectedTabId ? `?tabId=${selectedTabId}` : "";
@@ -240,8 +251,8 @@ function App() {
       localStorage.removeItem("token");
       return;
     }
-    const data = await res.json();
-    setTasks(data);
+    const data = await res.json().catch(() => []);
+    setTasks(Array.isArray(data) ? data : []);
   };
 
   React.useEffect(() => {
@@ -249,15 +260,38 @@ function App() {
     fetchBillingConfig();
     fetchTabs();
   }, [token]);
-
   React.useEffect(() => {
     if (!token) return;
     fetchTasks();
   }, [token, selectedTabId]);
-
   React.useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
+
+  // Autofocus no login/registro
+  React.useEffect(() => {
+    if (!token && usernameRef.current)
+      setTimeout(() => usernameRef.current?.focus(), 0);
+  }, [token, isRegister]);
+
+  // trata retorno do Checkout (paid/canceled)
+  React.useEffect(() => {
+    if (!token) return;
+    const url = new URL(window.location.href);
+    const paid = url.searchParams.get("paid");
+    const canceled = url.searchParams.get("canceled");
+    if (paid === "1") {
+      alert("Payment successful!");
+      setStoreOpen(false);
+      // recarrega dados
+      fetchTabs();
+      fetchTasks();
+      // limpa query
+      window.history.replaceState(null, "", url.pathname);
+    } else if (canceled === "1") {
+      window.history.replaceState(null, "", url.pathname);
+    }
+  }, [token]);
 
   const deleteTab = async (tabId) => {
     const ok = confirm("Delete this tab and all its tasks?");
@@ -284,11 +318,11 @@ function App() {
       body: JSON.stringify({ title, tabId: selectedTabId }),
     });
     if (res.status === 402) {
-      const n = billingCfg?.task_pack_size ?? 6;
-      const go = confirm(
-        `Task limit reached for this tab. Buy +${n} tasks (30 days)?`
-      );
-      if (go) await openCheckout("TASK_PACK", selectedTabId);
+      // Abre a loja com contexto
+      setStoreTaskPackTabId(selectedTabId);
+      setStoreFocus("TASK_PACK");
+      setStoreReason("TASK_LIMIT");
+      setStoreOpen(true);
       return;
     }
     setTitle("");
@@ -324,7 +358,7 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       localStorage.setItem("token", data.token);
       setToken(data.token);
@@ -341,7 +375,7 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken: response.credential }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       localStorage.setItem("token", data.token);
       setToken(data.token);
@@ -359,7 +393,17 @@ function App() {
     setSelectedTabId(null);
   };
 
+  // criar aba com pré-checagem de capacidade
   const createTab = async () => {
+    const cap = await fetch("/api/tabs/capacity", { headers: authHeaders })
+      .then((r) => r.json())
+      .catch(() => ({ canCreate: true }));
+    if (!cap.canCreate) {
+      setStoreFocus("TAB_SLOT");
+      setStoreReason("TAB_LIMIT");
+      setStoreOpen(true);
+      return;
+    }
     let newTabName = prompt(`New tab name (max ${TAB_NAME_MAX} chars)`);
     if (!newTabName) return;
     newTabName = newTabName.trim().slice(0, TAB_NAME_MAX);
@@ -370,8 +414,9 @@ function App() {
       body: JSON.stringify({ name: newTabName }),
     });
     if (res.status === 402) {
-      const go = confirm("Tab limit reached. Buy an additional tab (30 days)?");
-      if (go) await openCheckout("TAB_SLOT");
+      setStoreFocus("TAB_SLOT");
+      setStoreReason("TAB_LIMIT");
+      setStoreOpen(true);
       return;
     }
     if (res.ok) {
@@ -382,39 +427,470 @@ function App() {
     }
   };
 
-  // --- PWA: força atualização imediata ---
+  // PWA update forçado
   React.useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/service-worker.js").then((reg) => {
-        // força update check
         reg.update();
-
-        // puxa o SW novo imediatamente
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
+        if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
         reg.addEventListener("updatefound", () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (
-                newWorker.state === "installed" &&
-                navigator.serviceWorker.controller
-              ) {
-                newWorker.postMessage({ type: "SKIP_WAITING" });
-              }
-            });
-          }
+          const nw = reg.installing;
+          nw?.addEventListener("statechange", () => {
+            if (
+              nw.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              nw.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
         });
       });
-
-      // recarrega quando o novo SW assume o controle
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload();
       });
     }
   }, []);
 
+  /* ---------- UI helpers ---------- */
+  const fmtMoney = (cents, cur) =>
+    `${(cents / 100).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+    })} ${String(cur).toUpperCase()}`;
+  const addDays = (d, days) => new Date(d.getTime() + days * 86400000);
+  const expiryDate = () =>
+    addDays(
+      new Date(),
+      billingCfg?.entitlement_days ?? 30
+    ).toLocaleDateString();
+
+  const ReasonBanner = () => {
+    let msg = null;
+    if (storeReason === "TASK_LIMIT") {
+      msg =
+        "Parece que você estourou o limite de tarefas desta aba. Compre um pacote para liberar mais tarefas.";
+    } else if (storeReason === "TAB_LIMIT") {
+      msg =
+        "Você atingiu o limite de abas da sua conta. Compre um slot adicional para criar novas abas.";
+    }
+    return msg
+      ? e(
+          "div",
+          {
+            style: {
+              background: "#2a2300",
+              border: "1px solid #f1c40f66",
+              color: "#ffd",
+              padding: "8px 10px",
+              borderRadius: 8,
+              margin: "8px 0 4px",
+              fontSize: 13,
+            },
+          },
+          msg
+        )
+      : null;
+  };
+
+  const Info = ({ children }) =>
+    e(
+      "details",
+      {
+        style: {
+          marginTop: 6,
+          background: "#0b0b0b",
+          border: "1px dashed #555",
+          borderRadius: 8,
+          padding: "6px 10px",
+          fontSize: 12,
+        },
+      },
+      e("summary", { style: { cursor: "pointer" } }, "❓ Como funciona"),
+      e("div", { style: { opacity: 0.85, marginTop: 6 } }, children)
+    );
+
+  /* ---------- Modais ---------- */
+  const selectedTab = tabs.find((t) => t.id === selectedTabId) || null;
+  const storeSelectedTab =
+    tabs.find((t) => t.id === (storeTaskPackTabId ?? selectedTabId)) || null;
+
+  const Store = () =>
+    e(
+      "div",
+      {
+        style: {
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 9999,
+          padding: "1rem",
+        },
+        onClick: () => setStoreOpen(false),
+      },
+      e(
+        "div",
+        {
+          onClick: (ev) => ev.stopPropagation(),
+          style: {
+            width: "min(760px, 96vw)",
+            background: "#111",
+            border: "2px solid #f1c40f",
+            borderRadius: 12,
+            padding: "1rem",
+            color: "#fff",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+          },
+        },
+        e(
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 10 } },
+          e("h3", { style: { margin: 0 } }, "Store / Upgrades"),
+          e(
+            "span",
+            {
+              style: {
+                marginLeft: 6,
+                fontSize: 12,
+                padding: "2px 6px",
+                border: "1px solid #f1c40f55",
+                borderRadius: 6,
+                opacity: 0.8,
+              },
+              title: "Pagamentos pelo Stripe (use cartão de teste 4242...).",
+            },
+            "Stripe"
+          ),
+          e(
+            "button",
+            {
+              onClick: () => setStoreOpen(false),
+              style: { marginLeft: "auto" },
+              className: "icon-button",
+              title: "Close",
+            },
+            e("i", { className: "ph-bold ph-x" })
+          )
+        ),
+        e(ReasonBanner),
+
+        // seleção da aba alvo (pacote de tarefas)
+        e(
+          "div",
+          { style: { marginTop: 10 } },
+          e(
+            "label",
+            { style: { fontSize: 13, opacity: 0.8 } },
+            "Pacote de tarefas será aplicado à aba:"
+          ),
+          e(
+            "div",
+            {
+              style: {
+                display: "flex",
+                gap: 8,
+                marginTop: 6,
+                flexWrap: "wrap",
+              },
+            },
+            e(
+              "select",
+              {
+                value: storeTaskPackTabId ?? selectedTabId ?? "",
+                onChange: (ev) =>
+                  setStoreTaskPackTabId(Number(ev.target.value)),
+                style: {
+                  background: "#0c0c0c",
+                  color: "#fff",
+                  border: "1px solid #f1c40f55",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  minWidth: 180,
+                },
+              },
+              tabs.map((t) => e("option", { key: t.id, value: t.id }, t.name))
+            ),
+            storeSelectedTab &&
+              e(
+                "div",
+                {
+                  style: {
+                    fontSize: 12,
+                    padding: "8px 10px",
+                    border: "1px dashed #555",
+                    borderRadius: 8,
+                    background: "#0c0c0c",
+                    opacity: 0.9,
+                  },
+                },
+                "Selecionada: ",
+                e("b", null, storeSelectedTab.name),
+                " • Expira em ",
+                e("b", null, expiryDate())
+              )
+          )
+        ),
+
+        // cards
+        e(
+          "div",
+          {
+            style: {
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "1fr 1fr",
+              marginTop: 12,
+            },
+          },
+          // slot de aba
+          e(
+            "div",
+            {
+              style: {
+                border:
+                  storeFocus === "TAB_SLOT"
+                    ? "2px solid #ffd700"
+                    : "1px solid #f1c40f55",
+                borderRadius: 10,
+                padding: 14,
+                background: "#0c0c0c",
+              },
+            },
+            e("h4", { style: { marginTop: 0 } }, "Aba extra (30 dias)"),
+            e(
+              "p",
+              { style: { marginTop: 0, opacity: 0.85, fontSize: 13 } },
+              "Libera +1 slot de aba para sua conta (global). Expira em ",
+              e("b", null, expiryDate()),
+              "."
+            ),
+            e(
+              "div",
+              { style: { fontSize: 26, fontWeight: "bold" } },
+              billingCfg
+                ? fmtMoney(billingCfg.tab_price_cents, billingCfg.currency)
+                : "—"
+            ),
+            e(
+              "div",
+              { style: { display: "flex", gap: 8, marginTop: 10 } },
+              e(
+                "button",
+                { onClick: () => openCheckout("TAB_SLOT"), style: { flex: 1 } },
+                "Comprar"
+              ),
+              e(
+                "button",
+                {
+                  className: "icon-button",
+                  title: "DEV: conceder sem Stripe",
+                  onClick: () => fakeGrant("TAB_SLOT"),
+                },
+                e("i", { className: "ph-bold ph-flask" })
+              )
+            ),
+            e(
+              Info,
+              null,
+              "Cada compra adiciona um slot de aba por ",
+              e("b", null, `${billingCfg?.entitlement_days ?? 30} dias`),
+              ". Se você já tem o número máximo permitido, compre mais um para liberar a criação."
+            )
+          ),
+          // pacote de tarefas
+          e(
+            "div",
+            {
+              style: {
+                border:
+                  storeFocus === "TASK_PACK"
+                    ? "2px solid #ffd700"
+                    : "1px solid #f1c40f55",
+                borderRadius: 10,
+                padding: 14,
+                background: "#0c0c0c",
+              },
+            },
+            e(
+              "h4",
+              { style: { marginTop: 0 } },
+              `+${billingCfg?.task_pack_size ?? 6} tarefas (30 dias)`
+            ),
+            e(
+              "p",
+              { style: { marginTop: 0, opacity: 0.85, fontSize: 13 } },
+              "Válido apenas para a aba selecionada acima. Expira em ",
+              e("b", null, expiryDate()),
+              "."
+            ),
+            e(
+              "div",
+              { style: { fontSize: 26, fontWeight: "bold" } },
+              billingCfg
+                ? fmtMoney(
+                    billingCfg.task_pack_price_cents,
+                    billingCfg.currency
+                  )
+                : "—"
+            ),
+            e(
+              "div",
+              { style: { display: "flex", gap: 8, marginTop: 10 } },
+              e(
+                "button",
+                {
+                  onClick: () =>
+                    openCheckout(
+                      "TASK_PACK",
+                      storeTaskPackTabId ?? selectedTabId
+                    ),
+                  style: {
+                    flex: 1,
+                    opacity: storeTaskPackTabId ?? selectedTabId ? 1 : 0.6,
+                  },
+                  disabled: !(storeTaskPackTabId ?? selectedTabId),
+                  title:
+                    storeTaskPackTabId ?? selectedTabId
+                      ? ""
+                      : "Selecione uma aba acima",
+                },
+                "Comprar para esta aba"
+              ),
+              e(
+                "button",
+                {
+                  className: "icon-button",
+                  title: "DEV: conceder sem Stripe",
+                  onClick: () =>
+                    fakeGrant("TASK_PACK", storeTaskPackTabId ?? selectedTabId),
+                  disabled: !(storeTaskPackTabId ?? selectedTabId),
+                  style: {
+                    opacity: storeTaskPackTabId ?? selectedTabId ? 1 : 0.6,
+                  },
+                },
+                e("i", { className: "ph-bold ph-flask" })
+              )
+            ),
+            e(
+              Info,
+              null,
+              "O pacote soma ",
+              e("b", null, `+${billingCfg?.task_pack_size ?? 6} tarefas`),
+              " ao limite da aba escolhida pelo período informado."
+            )
+          )
+        ),
+        e(
+          "div",
+          { style: { marginTop: 12, fontSize: 12, opacity: 0.7 } },
+          "Upgrades comprados hoje expiram em ",
+          e("b", null, expiryDate()),
+          "."
+        )
+      )
+    );
+
+  // modal “Meus Upgrades”
+  const [upgOpen, setUpgOpen] = React.useState(false);
+  const [upgList, setUpgList] = React.useState([]);
+  const openUpgrades = async () => {
+    const res = await fetch("/api/billing/my-entitlements", {
+      headers: authHeaders,
+    });
+    const data = await res.json().catch(() => []);
+    setUpgList(Array.isArray(data) ? data : []);
+    setUpgOpen(true);
+  };
+  const UpgradesModal = () =>
+    e(
+      "div",
+      {
+        style: {
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 9999,
+          padding: "1rem",
+        },
+        onClick: () => setUpgOpen(false),
+      },
+      e(
+        "div",
+        {
+          onClick: (ev) => ev.stopPropagation(),
+          style: {
+            width: "min(720px, 96vw)",
+            background: "#111",
+            border: "2px solid #f1c40f",
+            borderRadius: 12,
+            padding: "1rem",
+            color: "#fff",
+          },
+        },
+        e(
+          "div",
+          { style: { display: "flex", alignItems: "center" } },
+          e("h3", { style: { margin: 0 } }, "Meus Upgrades"),
+          e(
+            "button",
+            {
+              className: "icon-button",
+              style: { marginLeft: "auto" },
+              onClick: () => setUpgOpen(false),
+            },
+            e("i", { className: "ph-bold ph-x" })
+          )
+        ),
+        e(
+          "div",
+          { style: { marginTop: 8, fontSize: 13, opacity: 0.8 } },
+          "Veja abaixo tudo que você já adquiriu e quando expira."
+        ),
+        e(
+          "div",
+          { style: { marginTop: 10, maxHeight: "60vh", overflow: "auto" } },
+          (upgList.length ? upgList : []).map((u) =>
+            e(
+              "div",
+              {
+                key: `${u.type}-${u.tab_id}-${u.expires_at}-${Math.random()}`,
+                style: {
+                  border: "1px solid #444",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginBottom: 8,
+                  background: "#0c0c0c",
+                },
+              },
+              e(
+                "div",
+                null,
+                e(
+                  "b",
+                  null,
+                  u.type === "TAB_SLOT"
+                    ? "Aba extra"
+                    : `Pacote de tarefas (+${u.amount})`
+                )
+              ),
+              e(
+                "div",
+                { style: { fontSize: 12, opacity: 0.9 } },
+                u.tab_name ? `Aba: ${u.tab_name}` : "Global",
+                " • Expira em ",
+                new Date(u.expires_at).toLocaleString(),
+                " • ",
+                u.is_active ? "Ativo ✅" : "Expirado ❌"
+              )
+            )
+          )
+        )
+      )
+    );
+
+  /* ---------- RENDER ---------- */
   if (!token) {
     return e(
       "div",
@@ -424,6 +900,8 @@ function App() {
         placeholder: "Username",
         maxLength: 50,
         value: username,
+        ref: usernameRef,
+        autoComplete: "username",
         onChange: (e) => setUsername(e.target.value),
         onKeyDown: (e) => {
           if (e.key === "Enter") handleAuth();
@@ -434,6 +912,7 @@ function App() {
         type: "password",
         maxLength: 50,
         placeholder: "Password",
+        autoComplete: isRegister ? "new-password" : "current-password",
         value: password,
         onChange: (e) => setPassword(e.target.value),
         onKeyDown: (e) => {
@@ -504,12 +983,34 @@ function App() {
       e(
         "button",
         {
-          onClick: logout,
-          style: { marginLeft: "auto", display: "flex", alignItems: "center" },
+          onClick: () => {
+            setStoreTaskPackTabId(selectedTabId);
+            setStoreFocus(null);
+            setStoreReason("MANUAL");
+            setStoreOpen(true);
+          },
+          className: "icon-button",
+          title: "Store / Upgrade",
+          style: { marginLeft: "auto" },
         },
+        e("i", { className: "ph-bold ph-coins" })
+      ),
+      e(
+        "button",
+        {
+          onClick: openUpgrades,
+          className: "icon-button",
+          title: "Meus Upgrades",
+        },
+        e("i", { className: "ph-bold ph-list-bullets" })
+      ),
+      e(
+        "button",
+        { onClick: logout, className: "icon-button", title: "Logout" },
         e("i", { className: "ph-bold ph-sign-out" })
       )
     ),
+
     e(
       "div",
       {
@@ -520,6 +1021,7 @@ function App() {
           gap: "0.25rem",
           flexWrap: "nowrap",
           overflowX: "auto",
+          overflowY: "hidden", // evita barra vertical
           WebkitOverflowScrolling: "touch",
           width: "100%",
           maxWidth: "400px",
@@ -536,7 +1038,7 @@ function App() {
             className: "tab-button",
             ref: setTabRef(tab.id),
             onPointerDown: (ev) => handleTabPointerDown(tab, ev),
-            onDoubleClick: () => handleTabDoubleClick(tab),
+            onDoubleClick: () => beginRenameTab(tab),
             onClick: () => setSelectedTabId(tab.id),
             onMouseMove: handleGlowMove,
             style: {
@@ -575,30 +1077,7 @@ function App() {
         "button",
         {
           className: "new-tab-button",
-          onClick: async () => {
-            // tenta criar, se bater limite, oferece compra
-            let newTabName = prompt(`New tab name (max ${TAB_NAME_MAX} chars)`);
-            if (!newTabName) return;
-            newTabName = newTabName.trim().slice(0, TAB_NAME_MAX);
-            if (!newTabName) return;
-            const res = await fetch("/api/tabs", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", ...authHeaders },
-              body: JSON.stringify({ name: newTabName }),
-            });
-            if (res.status === 402) {
-              const go = confirm(
-                "Tab limit reached. Buy an additional tab (30 days)?"
-              );
-              if (go) await openCheckout("TAB_SLOT");
-              return;
-            }
-            if (res.ok) await fetchTabs();
-            else {
-              const d = await res.json().catch(() => ({}));
-              alert(d.error || "Error creating tab");
-            }
-          },
+          onClick: createTab,
           onMouseMove: handleGlowMove,
           style: {
             flex: "0 0 auto",
@@ -617,11 +1096,12 @@ function App() {
         " New tab"
       )
     ),
+
     tabMenuTargetId &&
       e(
         "div",
         {
-          style: { position: "fixed", inset: 0, zIndex: 9999 },
+          style: { position: "fixed", inset: 0, zIndex: 9998 },
           onClick: () => setTabMenuTargetId(null),
         },
         e(
@@ -668,14 +1148,18 @@ function App() {
               className: "icon-button",
               title: `Buy +${billingCfg?.task_pack_size ?? 6} tasks`,
               onClick: () => {
-                openCheckout("TASK_PACK", tabMenuTargetId);
+                setStoreTaskPackTabId(tabMenuTargetId);
                 setTabMenuTargetId(null);
+                setStoreFocus("TASK_PACK");
+                setStoreReason("MANUAL");
+                setStoreOpen(true);
               },
             },
             e("i", { className: "ph-bold ph-plus-circle" })
           )
         )
       ),
+
     e(
       "div",
       { className: "footer" },
@@ -703,10 +1187,11 @@ function App() {
         })
       )
     ),
+
     e(
       "ul",
       null,
-      tasks.map((task) =>
+      (Array.isArray(tasks) ? tasks : []).map((task) =>
         e(
           "li",
           {
@@ -726,7 +1211,7 @@ function App() {
               { className: "neon-checkbox" },
               e("input", {
                 type: "checkbox",
-                checked: task.done,
+                checked: !!task.done,
                 onChange: () => toggleDone(task),
               }),
               e("div", { className: "neon-checkbox__frame" }, [
@@ -882,7 +1367,10 @@ function App() {
           )
         )
       )
-    )
+    ),
+
+    storeOpen && e(Store),
+    upgOpen && e(UpgradesModal)
   );
 }
 
@@ -890,20 +1378,16 @@ ReactDOM.render(e(App), document.getElementById("root"));
 
 let deferredPrompt;
 const installBtn = document.getElementById("install-btn");
-
 if (window.matchMedia("(display-mode: standalone)").matches) {
   if (installBtn) installBtn.style.display = "none";
 }
-
 window.addEventListener("beforeinstallprompt", (e) => {
   deferredPrompt = e;
   if (installBtn) installBtn.style.display = "inline-block";
 });
-
 window.addEventListener("appinstalled", () => {
   if (installBtn) installBtn.style.display = "none";
 });
-
 installBtn?.addEventListener("click", async () => {
   if (!deferredPrompt) return;
   await deferredPrompt.prompt();

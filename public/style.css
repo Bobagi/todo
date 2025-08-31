@@ -110,6 +110,8 @@ input[type="checkbox"] {
 }
 
 .tabs-track {
+  /* deixa scroller só quando realmente precisa */
+  overflow-y: hidden; /* <- remove barra vertical indesejada */
   scrollbar-width: thin;
   scrollbar-color: #f1c40f #0d0d0d;
 }

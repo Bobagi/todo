@@ -26,16 +26,14 @@ const pool = new Pool({
   password: process.env.POSTGRES_PASSWORD || "todo",
 });
 
-// ----- middleware order: static + webhook(raw) + json -----
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/service-worker.js", (req, res, next) => {
-  // garante que o SW nunca fica cacheado pelo navegador
   res.set("Cache-Control", "no-store");
   next();
 });
 
-// Stripe webhook (RAW body)
+/* -------------------- STRIPE WEBHOOK (RAW) -------------------- */
 app.post(
   "/api/billing/webhook",
   express.raw({ type: "application/json" }),
@@ -63,7 +61,6 @@ app.post(
         const amountCents = session.amount_total || 0;
         const currency = session.currency || "brl";
 
-        // idempotência (não duplica)
         const exists = await pool.query(
           "SELECT 1 FROM payments WHERE stripe_payment_intent_id=$1",
           [paymentIntentId]
@@ -82,8 +79,7 @@ app.post(
             ]
           );
 
-          // lê config atual
-          const cfg = await readBillingConfig();
+          const cfg = await readBillingConfigOrDefaults();
           const expiresSql = `now() + interval '${cfg.entitlement_days} days'`;
 
           if (actionType === "TAB_SLOT") {
@@ -92,11 +88,10 @@ app.post(
               [userId]
             );
           }
-
           if (actionType === "TASK_PACK" && tabId) {
             await pool.query(
               `INSERT INTO entitlements(user_id,type,tab_id,amount,expires_at) VALUES($1,'TASK_PACK',$2,$3,${expiresSql})`,
-              [userId, tabId, cfg.task_pack_size]
+              [userId, tabId, cfg.task_pack_size || 6]
             );
           }
         }
@@ -111,7 +106,7 @@ app.post(
 
 app.use(express.json());
 
-// ---------- auth ----------
+/* -------------------- AUTH -------------------- */
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email },
@@ -131,7 +126,7 @@ function auth(req, res, next) {
   }
 }
 
-// ---------- migrations ----------
+/* -------------------- MIGRATIONS (raw /migrations) -------------------- */
 async function runMigrations() {
   await pool.query(
     "CREATE TABLE IF NOT EXISTS schema_migrations (id SERIAL PRIMARY KEY, name TEXT UNIQUE, applied_at TIMESTAMPTZ DEFAULT now())"
@@ -153,10 +148,25 @@ async function runMigrations() {
   }
 }
 
-// ---------- helpers de billing ----------
+/* -------------------- BILLING HELPERS -------------------- */
 async function readBillingConfig() {
   const r = await pool.query("SELECT * FROM billing_config LIMIT 1");
   return r.rows[0];
+}
+async function readBillingConfigOrDefaults() {
+  let cfg = await readBillingConfig();
+  if (!cfg) {
+    cfg = {
+      currency: "brl",
+      tab_price_cents: 200,
+      task_pack_price_cents: 200,
+      task_pack_size: 6,
+      entitlement_days: 30,
+      base_tabs: 1,
+      base_tasks_per_tab: 6,
+    };
+  }
+  return cfg;
 }
 
 async function getActiveSum(userId, type, tabId) {
@@ -174,20 +184,18 @@ async function getActiveSum(userId, type, tabId) {
     return parseInt(r.rows[0].s || 0, 10);
   }
 }
-
 async function getAllowedTabSlots(userId) {
-  const cfg = await readBillingConfig();
+  const cfg = await readBillingConfigOrDefaults();
   const extra = await getActiveSum(userId, "TAB_SLOT", null);
   return (cfg.base_tabs || 1) + extra;
 }
-
 async function getAllowedTasksForTab(userId, tabId) {
-  const cfg = await readBillingConfig();
+  const cfg = await readBillingConfigOrDefaults();
   const extra = await getActiveSum(userId, "TASK_PACK", tabId);
   return (cfg.base_tasks_per_tab || 6) + extra;
 }
 
-// ---------- auth endpoints ----------
+/* -------------------- AUTH ENDPOINTS -------------------- */
 app.post("/api/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -204,7 +212,7 @@ app.post("/api/register", async (req, res) => {
       "INSERT INTO users(username,password) VALUES($1,$2) RETURNING id,username",
       [username, hashed]
     );
-    // cria aba default
+    // única criação automática: primeiro login/registro
     await pool.query(
       "INSERT INTO tabs(name,user_id,position) VALUES($1,$2,1)",
       ["Inbox", ins.rows[0].id]
@@ -241,12 +249,12 @@ app.post("/api/google-login", async (req, res) => {
     const payload = ticket.getPayload();
     const googleId = payload.sub;
     const email = payload.email;
-    let user;
+
     const r = await pool.query(
       "SELECT * FROM users WHERE google_id=$1 OR email=$2",
       [googleId, email]
     );
-    user = r.rows[0];
+    let user = r.rows[0];
     if (!user) {
       const result = await pool.query(
         "INSERT INTO users(email,google_id) VALUES($1,$2) RETURNING id,email",
@@ -272,9 +280,9 @@ app.get("/api/me", auth, async (req, res) => {
   });
 });
 
-// ---------- billing endpoints ----------
+/* -------------------- BILLING ENDPOINTS -------------------- */
 app.get("/api/billing/config", auth, async (req, res) => {
-  const cfg = await readBillingConfig();
+  const cfg = await readBillingConfigOrDefaults();
   res.json({
     currency: cfg.currency,
     tab_price_cents: cfg.tab_price_cents,
@@ -284,6 +292,19 @@ app.get("/api/billing/config", auth, async (req, res) => {
     base_tabs: cfg.base_tabs,
     base_tasks_per_tab: cfg.base_tasks_per_tab,
   });
+});
+
+app.get("/api/billing/my-entitlements", auth, async (req, res) => {
+  const r = await pool.query(
+    `SELECT e.id, e.type, e.tab_id, t.name AS tab_name, e.amount, e.expires_at,
+            (e.expires_at > now()) AS is_active
+       FROM entitlements e
+       LEFT JOIN tabs t ON t.id = e.tab_id
+      WHERE e.user_id = $1
+      ORDER BY e.expires_at DESC`,
+    [req.user.id]
+  );
+  res.json(r.rows);
 });
 
 app.post("/api/billing/checkout", auth, async (req, res) => {
@@ -299,7 +320,7 @@ app.post("/api/billing/checkout", auth, async (req, res) => {
     if (!owns.rowCount) return res.status(404).json({ error: "tab not found" });
   }
 
-  const cfg = await readBillingConfig();
+  const cfg = await readBillingConfigOrDefaults();
   const origin =
     req.headers.origin ||
     (req.headers.referer
@@ -333,9 +354,8 @@ app.post("/api/billing/checkout", auth, async (req, res) => {
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    payment_method_types: ["card", "pix"],
+    payment_method_types: ["card"], // simples/compatível
     line_items: [line],
-    // inclui id da sessão no retorno, útil se quiser consultar manualmente
     success_url: `${origin}/?paid=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?canceled=1`,
     metadata: {
@@ -348,13 +368,53 @@ app.post("/api/billing/checkout", auth, async (req, res) => {
   res.json({ url: session.url });
 });
 
-// ---------- tabs ----------
+// DEV: concede crédito local sem Stripe
+app.post("/api/billing/fake-grant", auth, async (req, res) => {
+  if (process.env.ALLOW_FAKE_PAYMENTS !== "true") {
+    return res.status(403).json({ error: "disabled" });
+  }
+  try {
+    const { actionType, tabId } = req.body || {};
+    const cfg = await readBillingConfigOrDefaults();
+    const expiresSql = `now() + interval '${cfg.entitlement_days} days'`;
+    if (actionType === "TAB_SLOT") {
+      await pool.query(
+        `INSERT INTO entitlements(user_id,type,tab_id,amount,expires_at) VALUES($1,'TAB_SLOT',NULL,1,${expiresSql})`,
+        [req.user.id]
+      );
+    } else if (actionType === "TASK_PACK" && tabId) {
+      await pool.query(
+        `INSERT INTO entitlements(user_id,type,tab_id,amount,expires_at) VALUES($1,'TASK_PACK',$2,$3,${expiresSql})`,
+        [req.user.id, tabId, cfg.task_pack_size]
+      );
+    } else {
+      return res.status(400).json({ error: "invalid actionType/tabId" });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "internal" });
+  }
+});
+
+/* -------------------- TABS -------------------- */
 app.get("/api/tabs", auth, async (req, res) => {
   const r = await pool.query(
     "SELECT id, name, position FROM tabs WHERE user_id=$1 ORDER BY position ASC, id ASC",
     [req.user.id]
   );
   res.json(r.rows);
+});
+
+// capacidade p/ criar nova aba
+app.get("/api/tabs/capacity", auth, async (req, res) => {
+  const allowed = await getAllowedTabSlots(req.user.id);
+  const current = (
+    await pool.query("SELECT COUNT(*)::int c FROM tabs WHERE user_id=$1", [
+      req.user.id,
+    ])
+  ).rows[0].c;
+  res.json({ allowed, current, canCreate: current < allowed });
 });
 
 app.post("/api/tabs", auth, async (req, res) => {
@@ -453,7 +513,7 @@ app.delete("/api/tabs/:id", auth, async (req, res) => {
   }
 });
 
-// ---------- tasks ----------
+/* -------------------- TASKS -------------------- */
 app.get("/api/tasks", auth, async (req, res) => {
   const tabId = req.query.tabId ? parseInt(req.query.tabId, 10) : null;
   if (tabId) {
@@ -483,7 +543,6 @@ app.post("/api/tasks", auth, async (req, res) => {
   if (!title) return res.status(400).json({ error: "title required" });
   const effectiveTabId = tabId || (await getDefaultTabId(req.user.id));
 
-  // limite por aba
   const allowed = await getAllowedTasksForTab(req.user.id, effectiveTabId);
   const c = await pool.query(
     "SELECT COUNT(*)::int AS c FROM tasks WHERE user_id=$1 AND tab_id=$2",
@@ -518,16 +577,25 @@ app.delete("/api/tasks/:id", auth, async (req, res) => {
   res.status(204).end();
 });
 
-// ---------- SPA fallback ----------
+/* -------------------- SPA FALLBACK -------------------- */
 app.get("/*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ---------- start ----------
+async function ensureBillingConfigDefaults() {
+  const r = await pool.query("SELECT COUNT(*)::int c FROM billing_config");
+  if (!r.rows[0].c) {
+    await pool.query(
+      `INSERT INTO billing_config
+      (currency, tab_price_cents, task_pack_price_cents, task_pack_size, entitlement_days, base_tabs, base_tasks_per_tab)
+      VALUES ('brl', 200, 200, 6, 30, 1, 6)`
+    );
+  }
+}
+
 async function start() {
   try {
     await runMigrations();
-    // garante config default
     await ensureBillingConfigDefaults();
     app.listen(port, () => {
       let url = `http://localhost:${port}`;
@@ -550,17 +618,6 @@ async function start() {
   } catch (err) {
     console.error(err);
     process.exit(1);
-  }
-}
-
-async function ensureBillingConfigDefaults() {
-  const r = await pool.query("SELECT COUNT(*)::int c FROM billing_config");
-  if (!r.rows[0].c) {
-    await pool.query(
-      `INSERT INTO billing_config
-      (currency, tab_price_cents, task_pack_price_cents, task_pack_size, entitlement_days, base_tabs, base_tasks_per_tab)
-      VALUES ('brl', 200, 200, 6, 30, 1, 6)`
-    );
   }
 }
 
