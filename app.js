@@ -24,7 +24,7 @@ function App() {
 
   const authHeaders = token ? { Authorization: "Bearer " + token } : {};
 
-  // drag state
+  // drag state (abas)
   const [isDraggingTabs, setIsDraggingTabs] = React.useState(false);
   const [draggingTabId, setDraggingTabId] = React.useState(null);
   const tabElementRefs = React.useRef({});
@@ -36,10 +36,18 @@ function App() {
   const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
   const [tabMenuPos, setTabMenuPos] = React.useState({ x: 0, y: 0 });
 
+  // drag state (tasks)
+  const [isDraggingTasks, setIsDraggingTasks] = React.useState(false);
+  const [draggingTaskId, setDraggingTaskId] = React.useState(null);
+  const taskElementRefs = React.useRef({});
+  const isDraggingTasksRef = React.useRef(false);
+  const draggingTaskIdRef = React.useRef(null);
+  const tasksRef = React.useRef([]);
+
   // foco no login
   const usernameRef = React.useRef(null);
 
-  // FLIP
+  // FLIP abas
   const setTabRef = (id) => (el) => {
     tabElementRefs.current[id] = el;
   };
@@ -56,6 +64,33 @@ function App() {
           requestAnimationFrame(() => {
             el.style.transition = "transform 160ms ease";
             el.style.transform = "translateX(0)";
+            setTimeout(() => {
+              el.style.transition = "";
+              el.style.transform = "";
+            }, 190);
+          });
+        }
+      });
+    });
+  };
+
+  // FLIP tasks
+  const setTaskRef = (id) => (el) => {
+    taskElementRefs.current[id] = el;
+  };
+  const runFlipY = (beforeTopById) => {
+    requestAnimationFrame(() => {
+      Object.keys(beforeTopById).forEach((id) => {
+        const el = taskElementRefs.current[id];
+        if (!el) return;
+        const afterTop = el.getBoundingClientRect().top;
+        const dy = beforeTopById[id] - afterTop;
+        if (dy !== 0) {
+          el.style.transition = "none";
+          el.style.transform = `translateY(${dy}px)`;
+          requestAnimationFrame(() => {
+            el.style.transition = "transform 160ms ease";
+            el.style.transform = "translateY(0)";
             setTimeout(() => {
               el.style.transition = "";
               el.style.transform = "";
@@ -120,7 +155,7 @@ function App() {
     }
   };
 
-  // drag handlers
+  // drag handlers (abas)
   const handleTabPointerDown = (tab, ev) => {
     const px = ev.clientX ?? ev.touches?.[0]?.clientX ?? 0;
     const py = ev.clientY ?? ev.touches?.[0]?.clientY ?? 0;
@@ -220,6 +255,86 @@ function App() {
     el.style.setProperty("--my", `${e.clientY - r.top}px`);
   };
 
+  // drag handlers (tasks)
+  const handleTaskPointerDown = (task, ev) => {
+    const py = ev.clientY ?? ev.touches?.[0]?.clientY ?? 0;
+    pointerStartRef.current = { x: 0, y: py };
+    draggingTaskIdRef.current = task.id;
+    setDraggingTaskId(task.id);
+    window.addEventListener("pointermove", handleTaskPointerMove, {
+      passive: true,
+    });
+    window.addEventListener("pointerup", handleTaskPointerUp);
+  };
+  const handleTaskPointerMove = (e) => {
+    const my = e.clientY;
+    const dy = Math.abs(my - pointerStartRef.current.y);
+    if (!isDraggingTasksRef.current) {
+      if (dy > 6) {
+        isDraggingTasksRef.current = true;
+        setIsDraggingTasks(true);
+      } else return;
+    }
+    const currentTasks = tasksRef.current;
+    const currentId = draggingTaskIdRef.current;
+    const currentIndex = currentTasks.findIndex((t) => t.id === currentId);
+    if (currentIndex < 0) return;
+
+    const beforeTopById = {};
+    currentTasks.forEach((t) => {
+      const el = taskElementRefs.current[t.id];
+      if (el) beforeTopById[t.id] = el.getBoundingClientRect().top;
+    });
+
+    const centers = currentTasks.map((t) => {
+      const el = taskElementRefs.current[t.id];
+      if (!el) return Number.POSITIVE_INFINITY;
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2;
+    });
+
+    let targetIndex = currentIndex;
+    for (let i = 0; i < centers.length; i++) {
+      if (my < centers[i]) {
+        targetIndex = i;
+        break;
+      }
+      targetIndex = i;
+    }
+
+    if (targetIndex !== currentIndex) {
+      const newTasks = currentTasks.slice();
+      const [moved] = newTasks.splice(currentIndex, 1);
+      newTasks.splice(targetIndex, 0, moved);
+      setTasks(newTasks);
+      runFlipY(beforeTopById);
+    }
+  };
+  const submitTaskOrder = async (newTasks) => {
+    if (!selectedTabId) return;
+    const orderedIds = newTasks.map((t) => t.id);
+    const res = await fetch("/api/tasks/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ orderedIds, tabId: selectedTabId }),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => []);
+      setTasks(Array.isArray(data) ? data : []);
+    }
+  };
+  const handleTaskPointerUp = async () => {
+    window.removeEventListener("pointermove", handleTaskPointerMove);
+    window.removeEventListener("pointerup", handleTaskPointerUp);
+    if (isDraggingTasksRef.current && draggingTaskIdRef.current != null) {
+      await submitTaskOrder(tasksRef.current);
+    }
+    isDraggingTasksRef.current = false;
+    setIsDraggingTasks(false);
+    draggingTaskIdRef.current = null;
+    setDraggingTaskId(null);
+  };
+
   // API
   const fetchBillingConfig = async () => {
     try {
@@ -267,6 +382,9 @@ function App() {
   React.useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
+  React.useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Autofocus no login/registro
   React.useEffect(() => {
@@ -330,6 +448,8 @@ function App() {
   };
 
   const deleteTask = async (id) => {
+    const ok = confirm("Delete this task?");
+    if (!ok) return;
     await fetch("/api/tasks/" + id, { method: "DELETE", headers: authHeaders });
     fetchTasks();
   };
@@ -1196,12 +1316,18 @@ function App() {
           "li",
           {
             key: task.id,
+            ref: setTaskRef(task.id),
+            onPointerDown: (ev) => handleTaskPointerDown(task, ev),
             style: {
               display: "flex",
               alignItems: "center",
               width: "100%",
               padding: "2%",
+              userSelect: isDraggingTasks ? "none" : "auto",
+              touchAction: "none",
+              cursor: isDraggingTasks ? "grabbing" : "grab",
             },
+            title: "Drag to reorder",
           },
           e(
             "div",

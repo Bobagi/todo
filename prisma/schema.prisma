@@ -8,24 +8,24 @@ datasource db {
 }
 
 model User {
-  id            Int             @id @default(autoincrement())
-  username      String?         @unique @db.Text
-  email         String?         @unique @db.Text
-  password      String?         @db.Text
-  google_id     String?         @db.Text @map("google_id")
-  tasks         Task[]
-  tabs          Tab[]
-  entitlements  Entitlement[]
-  payments      Payment[]
+  id           Int            @id @default(autoincrement())
+  username     String?        @unique @db.Text
+  email        String?        @unique @db.Text
+  password     String?        @db.Text
+  google_id    String?        @db.Text @map("google_id")
+  tasks        Task[]
+  tabs         Tab[]
+  entitlements Entitlement[]
+  payments     Payment[]
   @@map("users")
 }
 
 model Tab {
-  id           Int            @id @default(autoincrement())
-  name         String         @db.VarChar(30)
+  id           Int           @id @default(autoincrement())
+  name         String        @db.VarChar(30)
   user_id      Int
-  position     Int            @default(0)
-  user         User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  position     Int           @default(0)
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   tasks        Task[]
   entitlements Entitlement[]
   @@map("tabs")
@@ -34,55 +34,57 @@ model Tab {
 }
 
 model Task {
-  id      Int     @id @default(autoincrement())
-  title   String  @db.Text
-  done    Boolean @default(false)
-  user_id Int
-  tab_id  Int?
-  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  tab     Tab?    @relation(fields: [tab_id], references: [id], onDelete: Cascade)
+  id       Int     @id @default(autoincrement())
+  title    String  @db.Text
+  done     Boolean @default(false)
+  user_id  Int
+  tab_id   Int?
+  position Int     @default(0)
+  user     User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tab      Tab?    @relation(fields: [tab_id], references: [id], onDelete: Cascade)
   @@map("tasks")
   @@index([user_id])
   @@index([tab_id])
+  @@index([user_id, tab_id, position], map: "idx_tasks_user_tab_position")
 }
 
 model BillingConfig {
-  id                     Int    @id @default(autoincrement())
-  currency               String @default("brl") @db.Text
-  tab_price_cents        Int    @default(200)
-  task_pack_price_cents  Int    @default(200)
-  task_pack_size         Int    @default(6)
-  entitlement_days       Int    @default(30)
-  base_tabs              Int    @default(1)
-  base_tasks_per_tab     Int    @default(6)
+  id                    Int    @id @default(autoincrement())
+  currency              String @default("brl") @db.Text
+  tab_price_cents       Int    @default(200)
+  task_pack_price_cents Int    @default(200)
+  task_pack_size        Int    @default(6)
+  entitlement_days      Int    @default(30)
+  base_tabs             Int    @default(1)
+  base_tasks_per_tab    Int    @default(6)
   @@map("billing_config")
 }
 
 model Entitlement {
-  id          Int       @id @default(autoincrement())
-  user_id     Int
-  type        String    @db.Text
-  tab_id      Int?
-  amount      Int
-  expires_at  DateTime  @db.Timestamptz
-  created_at  DateTime? @default(now()) @db.Timestamptz
-  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  tab         Tab?      @relation(fields: [tab_id], references: [id], onDelete: Cascade)
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  type       String    @db.Text
+  tab_id     Int?
+  amount     Int
+  expires_at DateTime  @db.Timestamptz
+  created_at DateTime? @default(now()) @db.Timestamptz
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tab        Tab?      @relation(fields: [tab_id], references: [id], onDelete: Cascade)
   @@map("entitlements")
   @@index([user_id, type, expires_at], map: "idx_entitlements_user_type_expires")
   @@index([user_id, type, tab_id, expires_at], map: "idx_entitlements_user_type_tab_expires")
 }
 
 model Payment {
-  id                         Int       @id @default(autoincrement())
-  user_id                    Int?
-  stripe_payment_intent_id   String?   @unique @db.Text
-  amount_cents               Int?
-  currency                   String?   @db.Text
-  action_type                String?   @db.Text
-  tab_id                     Int?
-  quantity                   Int?
-  created_at                 DateTime? @default(now()) @db.Timestamptz
-  user                       User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id                       Int       @id @default(autoincrement())
+  user_id                  Int?
+  stripe_payment_intent_id String?   @unique @db.Text
+  amount_cents             Int?
+  currency                 String?   @db.Text
+  action_type              String?   @db.Text
+  tab_id                   Int?
+  quantity                 Int?
+  created_at               DateTime? @default(now()) @db.Timestamptz
+  user                     User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   @@map("payments")
 }

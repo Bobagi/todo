@@ -495,6 +495,29 @@ app.put("/api/tabs/:id", auth, async (req, res) => {
 
 app.delete("/api/tabs/:id", auth, async (req, res) => {
   const { id } = req.params;
+
+  // 1) não permitir excluir se for a única aba do usuário
+  const tabsCount = await pool.query(
+    "SELECT COUNT(*)::int c FROM tabs WHERE user_id=$1",
+    [req.user.id]
+  );
+  if (tabsCount.rows[0].c <= 1) {
+    return res
+      .status(400)
+      .json({ error: "cannot delete the only tab in the account" });
+  }
+
+  // 2) não permitir excluir se houver compras ativas ligadas à aba (TASK_PACK)
+  const hasActive = await pool.query(
+    "SELECT 1 FROM entitlements WHERE user_id=$1 AND tab_id=$2 AND type='TASK_PACK' AND expires_at>now() LIMIT 1",
+    [req.user.id, id]
+  );
+  if (hasActive.rowCount) {
+    return res
+      .status(400)
+      .json({ error: "cannot delete a tab with active purchases" });
+  }
+
   await pool.query("BEGIN");
   try {
     await pool.query("DELETE FROM tasks WHERE tab_id=$1 AND user_id=$2", [
@@ -518,7 +541,7 @@ app.get("/api/tasks", auth, async (req, res) => {
   const tabId = req.query.tabId ? parseInt(req.query.tabId, 10) : null;
   if (tabId) {
     const r = await pool.query(
-      "SELECT * FROM tasks WHERE user_id=$1 AND tab_id=$2 ORDER BY id DESC",
+      "SELECT * FROM tasks WHERE user_id=$1 AND tab_id=$2 ORDER BY position ASC, id ASC",
       [req.user.id, tabId]
     );
     return res.json(r.rows);
@@ -543,6 +566,7 @@ app.post("/api/tasks", auth, async (req, res) => {
   if (!title) return res.status(400).json({ error: "title required" });
   const effectiveTabId = tabId || (await getDefaultTabId(req.user.id));
 
+  // limite por aba
   const allowed = await getAllowedTasksForTab(req.user.id, effectiveTabId);
   const c = await pool.query(
     "SELECT COUNT(*)::int AS c FROM tasks WHERE user_id=$1 AND tab_id=$2",
@@ -551,11 +575,54 @@ app.post("/api/tasks", auth, async (req, res) => {
   if (c.rows[0].c >= allowed)
     return res.status(402).json({ error: "task limit reached" });
 
+  // posição nova (incremental na aba)
+  const posRows = await pool.query(
+    "SELECT COALESCE(MAX(position),0)+1 AS next FROM tasks WHERE user_id=$1 AND tab_id=$2",
+    [req.user.id, effectiveTabId]
+  );
+  const nextPos = posRows.rows[0].next;
+
   const r = await pool.query(
-    "INSERT INTO tasks(title,user_id,tab_id) VALUES($1,$2,$3) RETURNING *",
-    [title, req.user.id, effectiveTabId]
+    "INSERT INTO tasks(title,user_id,tab_id,position) VALUES($1,$2,$3,$4) RETURNING *",
+    [title, req.user.id, effectiveTabId, nextPos]
   );
   res.status(201).json(r.rows[0]);
+});
+
+app.post("/api/tasks/reorder", auth, async (req, res) => {
+  const { orderedIds, tabId } = req.body || {};
+  if (!Array.isArray(orderedIds) || !orderedIds.length || !tabId) {
+    return res.status(400).json({ error: "orderedIds and tabId required" });
+  }
+
+  // verifica ownership e mesma aba
+  const rows = await pool.query(
+    "SELECT id FROM tasks WHERE user_id=$1 AND tab_id=$2 AND id = ANY($3::int[])",
+    [req.user.id, tabId, orderedIds]
+  );
+  if (rows.rowCount !== orderedIds.length) {
+    return res.status(400).json({ error: "some tasks not found in this tab" });
+  }
+
+  await pool.query("BEGIN");
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await pool.query(
+        "UPDATE tasks SET position=$1 WHERE id=$2 AND user_id=$3 AND tab_id=$4",
+        [i + 1, orderedIds[i], req.user.id, tabId]
+      );
+    }
+    await pool.query("COMMIT");
+  } catch (e) {
+    await pool.query("ROLLBACK");
+    return res.status(500).end();
+  }
+
+  const out = await pool.query(
+    "SELECT * FROM tasks WHERE user_id=$1 AND tab_id=$2 ORDER BY position ASC, id ASC",
+    [req.user.id, tabId]
+  );
+  res.json(out.rows);
 });
 
 app.put("/api/tasks/:id", auth, async (req, res) => {
