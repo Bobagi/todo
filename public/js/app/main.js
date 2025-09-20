@@ -41,6 +41,7 @@ function App() {
   const [editingTitle, setEditingTitle] = React.useState("");
 
   const [billingCfg, setBillingCfg] = React.useState(null);
+  const [services, setServices] = React.useState([]);
 
   // Loja
   const [storeOpen, setStoreOpen] = React.useState(false);
@@ -57,6 +58,22 @@ function App() {
     const open = () => setAboutOpen(true);
     window.addEventListener("open-about-modal", open);
     return () => window.removeEventListener("open-about-modal", open);
+  }, []);
+
+  React.useEffect(() => {
+    let disposed = false;
+    fetch("/api/compose/services")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (disposed) return;
+        setServices(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!disposed) setServices([]);
+      });
+    return () => {
+      disposed = true;
+    };
   }, []);
 
   // Auth refs
@@ -502,6 +519,97 @@ function App() {
         e("i", { className: "ph-bold ph-sign-out" })
       )
     ),
+
+    // docker compose services
+    services.length > 0 &&
+      e(
+        "section",
+        { className: "docker-services" },
+        e(
+          "div",
+          { className: "docker-services__grid" },
+          services.map((svc) => {
+            const title =
+              svc?.containerName || svc?.name || svc?.label || svc?.id;
+            const subtitle =
+              svc?.label && svc.label !== title ? svc.label : null;
+            const image = svc?.image || svc?.imageName || null;
+            const hostPort =
+              svc?.externalPort ?? svc?.hostPort ?? svc?.port ?? null;
+            const internalPort =
+              svc?.internalPort ?? svc?.containerPort ?? svc?.targetPort ?? null;
+            const protocol = svc?.protocol ?? svc?.scheme ?? null;
+            const note = svc?.note ?? null;
+            const statusColor = svc?.statusColor || "#2ecc71";
+            const statusLabel =
+              svc?.statusLabel || "Status reportado pelo Docker Compose.";
+
+            const portChildren = [];
+            if (hostPort !== null && hostPort !== undefined && hostPort !== "") {
+              portChildren.push("Porta externa: ");
+              portChildren.push(
+                e("strong", { key: "ext" }, String(hostPort))
+              );
+              if (internalPort) {
+                portChildren.push(` → ${internalPort}`);
+              }
+              if (protocol) {
+                portChildren.push(` (${String(protocol).toUpperCase()})`);
+              }
+            } else if (internalPort) {
+              portChildren.push(
+                `Sem porta externa • Porta interna ${internalPort}`
+              );
+            } else {
+              portChildren.push("Sem portas expostas");
+            }
+
+            return e(
+              "article",
+              {
+                key: svc?.id || title,
+                className: "docker-services__card",
+              },
+              e(
+                "header",
+                { className: "docker-services__card-header" },
+                e("span", {
+                  className: "docker-services__status",
+                  style: { backgroundColor: statusColor },
+                  title: statusLabel,
+                }),
+                e("i", {
+                  className: "ph-bold ph-docker-logo",
+                  "aria-hidden": "true",
+                }),
+                e(
+                  "div",
+                  { className: "docker-services__names" },
+                  e("strong", null, title),
+                  subtitle && e("span", null, subtitle)
+                )
+              ),
+              image &&
+                e(
+                  "div",
+                  { className: "docker-services__image" },
+                  image
+                ),
+              e(
+                "div",
+                { className: "docker-services__port" },
+                portChildren
+              ),
+              note &&
+                e(
+                  "div",
+                  { className: "docker-services__note" },
+                  note
+                )
+            );
+          })
+        )
+      ),
 
     /* ... (resto permanece igual: abas, menu long-press, add task e lista) ... */
     // tabs

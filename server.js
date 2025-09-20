@@ -47,6 +47,57 @@ app.use("/api", createBillingRoutes({ auth, stripe }));
 app.use("/api", createTabsRoutes({ auth }));
 app.use("/api", createTasksRoutes({ auth }));
 
+app.get("/api/compose/services", (req, res) => {
+  const projectName =
+    process.env.COMPOSE_PROJECT_NAME || path.basename(process.cwd());
+  const toPort = (value, fallback = null) => {
+    if (value === undefined || value === null || value === "") {
+      return fallback;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : value;
+  };
+
+  const services = [
+    {
+      id: "web",
+      label: "Web",
+      containerName: `${projectName}-web-1`,
+      image: `${projectName}-web:latest`,
+      internalPort: 3000,
+      externalPort: toPort(process.env.WEB_PORT, 3000),
+      protocol: "http",
+      note: "Interface principal do app.",
+    },
+    {
+      id: "studio",
+      label: "Prisma Studio",
+      containerName: `${projectName}-studio-1`,
+      image: `${projectName}-studio:latest`,
+      internalPort: 5555,
+      externalPort: toPort(process.env.PRISMA_STUDIO_PORT, 5555),
+      protocol: "http",
+      note: "Ferramenta de inspeção do banco de dados.",
+    },
+    {
+      id: "db",
+      label: "PostgreSQL",
+      containerName: `${projectName}-db-1`,
+      image: "postgres:14",
+      internalPort: 5432,
+      externalPort:
+        toPort(
+          process.env.POSTGRES_EXTERNAL_PORT || process.env.POSTGRES_PORT,
+          null
+        ),
+      protocol: "tcp",
+      note: "Banco acessível apenas internamente por padrão.",
+    },
+  ];
+
+  res.json(services);
+});
+
 // me
 app.get("/api/me", auth, async (req, res) => {
   res.json({

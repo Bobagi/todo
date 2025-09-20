@@ -203,6 +203,86 @@ input[type="checkbox"] {
   color: #fff;
 }
 
+/* Docker services */
+.docker-services {
+  width: 100%;
+  max-width: 960px;
+  margin: 1.5rem auto;
+}
+
+.docker-services__grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.docker-services__card {
+  background: #111;
+  border: 2px solid #f1c40f44;
+  border-radius: 12px;
+  padding: 1rem;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.docker-services__card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f1c40f;
+  font-size: 0.95rem;
+}
+
+.docker-services__status {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(46, 204, 113, 0.8);
+  background: #2ecc71;
+}
+
+.docker-services__names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docker-services__names strong {
+  font-size: 1rem;
+  color: #fff;
+}
+
+.docker-services__names span {
+  font-size: 0.8rem;
+  color: #f1c40fcc;
+}
+
+.docker-services__image {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.docker-services__port {
+  font-size: 0.9rem;
+  color: #f1c40f;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.docker-services__port strong {
+  font-size: 1.05rem;
+}
+
+.docker-services__note {
+  font-size: 0.8rem;
+  color: #f1c40fcc;
+  line-height: 1.35;
+}
+
 /* Password strength meter */
 .pw-meter {
   display: grid;
