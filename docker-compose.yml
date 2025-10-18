@@ -25,7 +25,7 @@ services:
     entrypoint: [""] # <— importantíssimo: NÃO roda o docker-entrypoint.sh aqui
     command: sh -c "npx prisma generate && npx prisma studio --port 5555 --hostname 0.0.0.0 --browser none"
     ports:
-      - "${PRISMA_STUDIO_PORT:-5555}:5555"
+      - "127.0.0.1:${PRISMA_STUDIO_PORT:-5555}:5555"
 
   db:
     image: postgres:14
