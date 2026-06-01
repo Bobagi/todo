@@ -1,0 +1,17 @@
+# To do
+
+To do is a fast productivity Progressive Web App (PWA) to organize tasks
+and simplify your life. It supports task tabs, accounts (Google sign-in)
+and works offline as an installable app.
+
+## Canonical URL
+- https://todo.bobagi.space/
+
+## Language
+- English (en)
+
+## Important pages
+- Home / App: https://todo.bobagi.space/
+
+## Source
+- GitHub: https://github.com/Bobagi/todo

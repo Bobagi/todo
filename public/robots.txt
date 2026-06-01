@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# Keep auth/billing endpoints out of the index
+Disallow: /api/
+
+Sitemap: https://todo.bobagi.space/sitemap.xml
+
+# Hint for AI crawlers/tools
+# https://llmstxt.org/
+LLM: https://todo.bobagi.space/llms.txt

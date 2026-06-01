@@ -2,3 +2,7 @@ node_modules/
 client/build/
 .env
 *.txt
+
+# SEO files must be tracked despite the broad *.txt rule above
+!public/robots.txt
+!public/llms.txt
