@@ -123,10 +123,16 @@ function createAuthRoutes({ pool, generateToken }) {
       const googleId = payload.sub;
       const email = payload.email;
 
-      const r = await pool.query(
-        "SELECT * FROM users WHERE google_id=$1 OR email=$2",
-        [googleId, email]
-      );
+      // Only trust a Google-verified email, and match STRICTLY by the stable subject
+      // (google_id) — never auto-link by email, which would let a Google account log
+      // into a same-email local account (account takeover). New google_id => new account.
+      if (!payload.email_verified) {
+        return res.status(400).json({ error: "google email not verified" });
+      }
+
+      const r = await pool.query("SELECT * FROM users WHERE google_id=$1", [
+        googleId,
+      ]);
       let user = r.rows[0];
       if (!user) {
         const result = await pool.query(

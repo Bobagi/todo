@@ -34,6 +34,11 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="neon-checkbox.css" />
     <meta name="theme-color" content="#FFD700">
+    <script>
+      // Public Google OAuth client id, injected by the server from GOOGLE_CLIENT_ID.
+      // Empty when Google login isn't configured → the button simply isn't rendered.
+      window.__GOOGLE_CLIENT_ID__ = "%GOOGLE_CLIENT_ID%";
+    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script defer src="https://analytics.bobagi.space/script.js" data-website-id="b9c03027-326f-45fd-a902-16c2fc8a08a9"></script>
   </head>

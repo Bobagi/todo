@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const cors = require("cors");
 const Stripe = require("stripe");
 require("dotenv").config();
@@ -34,8 +35,24 @@ app.post(
 // JSON depois do webhook
 app.use(express.json());
 
-// static
-app.use(express.static(path.join(__dirname, "public")));
+// index.html is served with the (public) Google client id injected from env — a Google
+// client id is exposed in the browser by design, so this is not a secret. Serving it here
+// (instead of the raw static file) is what makes the "Sign in with Google" button real.
+const INDEX_HTML = fs.readFileSync(
+  path.join(__dirname, "public", "index.html"),
+  "utf8"
+);
+function sendIndex(req, res) {
+  // Defense-in-depth: only inject a well-formed Google client id so a malformed env value
+  // can never break out of the JS string / <script> context. Bad value => empty (feature off).
+  const raw = process.env.GOOGLE_CLIENT_ID || "";
+  const clientId = /^[\w-]+\.apps\.googleusercontent\.com$/.test(raw) ? raw : "";
+  res.type("html").send(INDEX_HTML.replace(/%GOOGLE_CLIENT_ID%/g, clientId));
+}
+app.get(["/", "/index.html"], sendIndex);
+
+// static (index:false so "/" and "/index.html" don't bypass the injection above)
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
 app.use("/service-worker.js", (req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
@@ -57,9 +74,7 @@ app.get("/api/me", auth, async (req, res) => {
 });
 
 // SPA fallback
-app.get("/*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+app.get("/*", sendIndex);
 
 async function start() {
   try {

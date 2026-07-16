@@ -61,6 +61,7 @@ function App() {
 
   // Auth refs
   const usernameRef = React.useRef(null);
+  const googleBtnRef = React.useRef(null);
 
   // Long-press menu das abas
   const [tabMenuTargetId, setTabMenuTargetId] = React.useState(null);
@@ -298,7 +299,7 @@ function App() {
     } else alert(d.error || "Auth error");
   }
 
-  window.handleCredentialResponse = async (response) => {
+  const handleCredentialResponse = async (response) => {
     const r = await fetch("/api/google-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -311,6 +312,34 @@ function App() {
       fetchTabs();
     } else alert(d.error || "Google auth error");
   };
+
+  // Render the real "Sign in with Google" button once the GIS script is ready and a
+  // client id was injected. If GOOGLE_CLIENT_ID is unset the button is skipped entirely
+  // (no broken button, no console errors) — email/password login still works.
+  React.useEffect(() => {
+    if (token) return;
+    const clientId = window.__GOOGLE_CLIENT_ID__;
+    if (!clientId || clientId.startsWith("%")) return; // unconfigured / uninjected
+    let tries = 0;
+    const iv = setInterval(() => {
+      const gid = window.google?.accounts?.id;
+      if (gid && googleBtnRef.current) {
+        clearInterval(iv);
+        googleBtnRef.current.replaceChildren(); // avoid stacking a 2nd button on re-render
+        gid.initialize({ client_id: clientId, callback: handleCredentialResponse });
+        gid.renderButton(googleBtnRef.current, {
+          theme: "filled_black",
+          size: "large",
+          text: "continue_with",
+          shape: "rectangular",
+          width: 320,
+        });
+      } else if (++tries > 40) {
+        clearInterval(iv); // ~8s: give up quietly if GIS never loads
+      }
+    }, 200);
+    return () => clearInterval(iv);
+  }, [token, isRegister]);
 
   function logout() {
     localStorage.removeItem("token");
@@ -427,19 +456,10 @@ function App() {
         { onClick: () => setIsRegister(!isRegister), className: "auth-button" },
         isRegister ? "Have an account? Login" : "No account? Register"
       ),
-      e(
-        "div",
-        { style: { marginTop: "1rem" } },
-        e("div", {
-          id: "g_id_onload",
-          "data-client_id": "GOOGLE_CLIENT_ID",
-          "data-callback": "handleCredentialResponse",
-        }),
-        e("div", {
-          className: "g_id_signin auth-button",
-          "data-type": "standard",
-        })
-      )
+      e("div", {
+        ref: googleBtnRef,
+        style: { marginTop: "1rem", display: "flex", justifyContent: "center" },
+      })
     );
   }
 
