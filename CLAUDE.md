@@ -107,8 +107,8 @@ CoinHub — todo já tinha esse fluxo 90% pronto; só faltava um client id real 
   `.claude/security-sweep/20260716-google-login/`): forja/injeção testadas ao vivo, 0 achado aberto.
 - **⚠️ PASSO MANUAL DO OPERADOR (obrigatório p/ o botão funcionar em prod):** adicionar
   **`https://todo.bobagi.space`** em *Authorized JavaScript origins* do OAuth client no Google Cloud
-  Console (projeto `956230576576`). Até lá o console mostra "origin not allowed" e o botão não
-  renderiza (login e‑mail/senha funciona normal). Consideração: a tela de consentimento mostrará o
+  Console (projeto `956230576576`). Até lá o **botão APARECE mas o clique falha** com "origin not
+  allowed" no console (login e‑mail/senha funciona normal). Consideração: a tela de consentimento mostrará o
   nome do projeto CoinHub — se quiser separação, criar um client dedicado e trocar o `GOOGLE_CLIENT_ID`
   (é 1 env var).
 
