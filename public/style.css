@@ -1,3 +1,36 @@
+/* Base hygiene (added 2026-07-15, code-standards pass) */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+/* keep the borrowed neon-checkbox component pixel-identical */
+.neon-checkbox,
+.neon-checkbox *,
+.neon-checkbox *::before,
+.neon-checkbox *::after {
+  box-sizing: content-box;
+}
+
+/* Visible keyboard focus ring (was missing entirely — invisible in screenshots,
+   fails every keyboard user). White ring reads on both the black bg and yellow buttons. */
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion: calm the neon checkbox's particle/ring/spark animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   background-color: #0d0d0d;
   color: #f1c40f;

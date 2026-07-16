@@ -6,3 +6,5 @@ client/build/
 # SEO files must be tracked despite the broad *.txt rule above
 !public/robots.txt
 !public/llms.txt
+# local review artifacts (frontend-review screenshots/reports)
+.claude/
