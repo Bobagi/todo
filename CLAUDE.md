@@ -179,13 +179,23 @@ como perda financeira, mas ainda vale desligar por higiene quando mexer nessa á
   `/migrations` mas não aplica nada (as migrations reais são o SQL cru aplicado pelo entrypoint).
   Dois sistemas de migration — considerar remover a chamada em `server.js:9`.
 
+### Redesign de UI — FEITO 2026‑07‑16 (frontend-design → frontend-review)
+Direção **"arcade cabinet, after hours"**: um **único** accent dourado (`--gold`, fim da briga de
+2 amarelos), **coral reservado só p/ destrutivo** (cor com significado), tipografia **Space Grotesk
+self-hosted** (`public/fonts/space-grotesk.woff2`, 22KB), sistema de **tokens em `:root`**
+(`public/style.css` reescrito). Resolvidos todos os P1/P2 do review: header mobile não quebra mais o
+título, **hierarquia de botão** (`.btn--primary/ghost/danger` + `.iconbtn` — deletar deixou de gritar),
+idioma **EN**, **empty-state** desenhado, `alert/prompt/confirm` nativos → **toasts + modal temáticos**
+(`main.js` agora é class-based; corrida save-on-blur blindada com `onMouseDown preventDefault`), foco de
+teclado, reduced-motion. Neon checkbox preservado 1:1 (gold re-tokenizado). Relatório+screenshots em
+`.claude/frontend-review/20260716-redesign/`. **SEAM conhecido:** a loja/upgrades (`store.js`) continua
+em **PT + estilo antigo** (superfície de billing congelada) — restilizar/traduzir ou esconder quando
+decidir o destino do Stripe. Tudo fora desse modal foi repaginado.
+
 ### Backlog de portfólio (o operador decide o que atacar)
-1. **Polir a UI** (frontend-design): tokens de cor únicos, hierarquia de botões (primário/ghost/
-   danger), idioma único (EN), empty‑state, trocar `alert/confirm/prompt` por toasts/modais, header
-   mobile que não quebra o título. 2. **Google login: FEITO** (2026‑07‑16, ver seção acima — só falta o passo do operador no console).
-   **Stripe:** congelado (não ativar). A loja/erros de console de billing seguem como estavam. 3.
-   **`test-forge`**: 1 smoke test (auth + tabs/tasks) para o app "parecer sério". 4. **`app-essentials`**
-   se quiser subir o nível: reset de senha/verificação de e‑mail/exclusão de conta. 5. Commitar+pushar
-   o `deploy.sh` pendente + o bind `127.0.0.1` do compose (GitHub está atrás — ver "Pendências de git").
+1. **`test-forge`**: 1 smoke test (auth + tabs/tasks) para o app "parecer sério".
+2. **`app-essentials`** se quiser subir o nível: reset de senha/verificação de e‑mail/exclusão de conta.
+3. **Loja/Stripe** congelado (não ativar) — quando decidir: restilizar `store.js` p/ o novo design (EN)
+   ou remover a loja p/ uma demo limpa. **Google login:** FEITO (só falta o passo do operador no console).
 - **security-sweep** (não‑pagamento): CORS `*`, sem CSP, sem rate‑limit no login, IDOR no move de
   task — rodar quando a direção da UI estabilizar.

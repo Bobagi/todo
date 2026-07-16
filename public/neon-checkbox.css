@@ -1,8 +1,9 @@
 /* From Uiverse.io by 00Kubi */
 .neon-checkbox {
-  --primary: #ffd700;
-  --primary-dark: #ccac00;
-  --primary-light: #fff799;
+  /* unified with the app's single gold accent (design tokens in style.css) */
+  --primary: var(--gold-bright, #ffd95e);
+  --primary-dark: var(--gold-deep, #c99a1e);
+  --primary-light: var(--gold-soft, #fff0b8);
   --size: 30px;
   flex-shrink: 0;
   flex-grow: 0;
