@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { e } from "./utils.js";
 
 export function AboutModal({ open, setOpen, billingCfg }) {
@@ -37,14 +38,14 @@ export function AboutModal({ open, setOpen, billingCfg }) {
       e(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8 } },
-        e("h3", { style: { margin: 0 } }, "About"),
+        e("h3", { style: { margin: 0 } }, t("about.title")),
         e(
           "button",
           {
             className: "icon-button",
             style: { marginLeft: "auto" },
             onClick: () => setOpen(false),
-            title: "Close",
+            title: t("common.close"),
           },
           e("i", { className: "ph-bold ph-x" })
         )
@@ -52,35 +53,38 @@ export function AboutModal({ open, setOpen, billingCfg }) {
       e(
         "div",
         { className: "about-kv" },
-        e("div", { className: "k" }, "App version:"),
+        e("div", { className: "k" }, t("about.version")),
         e("div", { className: "v" }, appVersion),
 
-        e("div", { className: "k" }, "SW cache:"),
+        e("div", { className: "k" }, t("about.sw")),
         e("div", { className: "v" }, swVersion),
 
-        e("div", { className: "k" }, "Default limits:"),
+        e("div", { className: "k" }, t("about.limits")),
         e(
           "div",
           { className: "v" },
           billingCfg
-            ? `tabs = ${billingCfg.base_tabs}, tasks/aba = ${billingCfg.base_tasks_per_tab}`
+            ? t("about.limitsValue", {
+                tabs: billingCfg.base_tabs,
+                tasks: billingCfg.base_tasks_per_tab,
+              })
             : "—"
         )
       ),
       e(
         "div",
         { style: { marginTop: 10, fontSize: 13, opacity: 0.9 } },
-        "Legal: ",
+        t("about.legal"),
         e(
           "a",
           { href: "/legal/terms.html", target: "_blank" },
-          "Termos de Uso"
+          t("auth.terms")
         ),
         " • ",
         e(
           "a",
           { href: "/legal/privacy.html", target: "_blank" },
-          "Política de Privacidade"
+          t("auth.privacy")
         )
       )
     )

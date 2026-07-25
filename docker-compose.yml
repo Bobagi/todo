@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${WEB_PORT}:3000"
     env_file:
@@ -14,7 +14,12 @@ services:
 
   studio:
     build: .
-    restart: on-failure
+    # Prisma Studio = painel admin do banco. Fica DESLIGADO por padrão (2026-07-22):
+    # o subdomínio studio.todo.bobagi.space foi derrubado a pedido do operador.
+    # Para usar em manutenção: docker compose --profile admin up -d studio
+    # e alcançar via túnel SSH -> http://127.0.0.1:5556  (nunca expor publicamente).
+    profiles: ['admin']
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -29,7 +34,7 @@ services:
 
   db:
     image: postgres:14
-    restart: on-failure
+    restart: unless-stopped
     env_file:
       - .env
     environment:

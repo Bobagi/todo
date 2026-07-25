@@ -1,4 +1,5 @@
 import { fakeGrant, myEntitlements, openCheckout } from "./api.js";
+import { t } from "./i18n.js";
 import { e, fmtMoney, getExpiryDateString } from "./utils.js";
 
 export function StoreModal({
@@ -26,10 +27,10 @@ export function StoreModal({
     let msg = null;
     if (storeReason === "TASK_LIMIT")
       msg =
-        "Parece que você estourou o limite de tarefas desta aba. Compre um pacote para liberar mais tarefas.";
+        t("store.taskLimit");
     if (storeReason === "TAB_LIMIT")
       msg =
-        "Você atingiu o limite de abas da sua conta. Compre um slot adicional para criar novas abas.";
+        t("store.tabLimit");
     return msg
       ? e(
           "div",
@@ -62,7 +63,7 @@ export function StoreModal({
           fontSize: 12,
         },
       },
-      e("summary", { style: { cursor: "pointer" } }, "❓ Como funciona"),
+      e("summary", { style: { cursor: "pointer" } }, t("store.howItWorks")),
       e("div", { style: { opacity: 0.85, marginTop: 6 } }, children)
     );
 
@@ -97,7 +98,7 @@ export function StoreModal({
       e(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 10 } },
-        e("h3", { style: { margin: 0 } }, "Store / Upgrades"),
+        e("h3", { style: { margin: 0 } }, t("store.title")),
         e(
           "span",
           {
@@ -109,7 +110,7 @@ export function StoreModal({
               borderRadius: 6,
               opacity: 0.8,
             },
-            title: "Pagamentos via Stripe (use 4242...)",
+            title: t("store.stripeTitle"),
           },
           "Stripe"
         ),
@@ -122,7 +123,7 @@ export function StoreModal({
             },
             className: "icon-button",
             style: { marginLeft: "auto" },
-            title: "Sobre o app",
+            title: t("store.about"),
           },
           e("i", { className: "ph-bold ph-info" })
         ),
@@ -131,7 +132,7 @@ export function StoreModal({
           {
             onClick: () => setStoreOpen(false),
             className: "icon-button",
-            title: "Close",
+            title: t("common.close"),
           },
           e("i", { className: "ph-bold ph-x" })
         )
@@ -145,7 +146,7 @@ export function StoreModal({
         e(
           "label",
           { style: { fontSize: 13, opacity: 0.8 } },
-          "Pacote de tarefas será aplicado à aba:"
+          t("store.packAppliesTo")
         ),
         e(
           "div",
@@ -181,9 +182,9 @@ export function StoreModal({
                   opacity: 0.9,
                 },
               },
-              "Selecionada: ",
+              t("store.selected"),
               e("b", null, selectedTab.name),
-              " • Expira em ",
+              t("store.expires"),
               e("b", null, expiry)
             )
         )
@@ -214,11 +215,11 @@ export function StoreModal({
               background: "#0c0c0c",
             },
           },
-          e("h4", { style: { marginTop: 0 } }, "Aba extra (30 dias)"),
+          e("h4", { style: { marginTop: 0 } }, t("store.tabSlot")),
           e(
             "p",
             { style: { marginTop: 0, opacity: 0.85, fontSize: 13 } },
-            "Libera +1 slot de aba para sua conta (global). Expira em ",
+            t("store.tabSlotDesc"),
             e("b", null, expiry),
             "."
           ),
@@ -238,13 +239,13 @@ export function StoreModal({
                 onClick: () => openCheckout(token, "TAB_SLOT"),
                 style: { flex: 1 },
               },
-              "Comprar"
+              t("store.buy")
             ),
             e(
               "button",
               {
                 className: "icon-button",
-                title: "DEV: conceder sem Stripe",
+                title: t("store.devGrant"),
                 onClick: async () => {
                   const r = await fakeGrant(token, "TAB_SLOT");
                   if (!r.ok) {
@@ -285,12 +286,12 @@ export function StoreModal({
           e(
             "h4",
             { style: { marginTop: 0 } },
-            `+${billingCfg?.task_pack_size ?? 6} tarefas (30 dias)`
+            t("store.taskPackTitle", { n: billingCfg?.task_pack_size ?? 6 })
           ),
           e(
             "p",
             { style: { marginTop: 0, opacity: 0.85, fontSize: 13 } },
-            "Válido apenas para a aba selecionada acima. Expira em ",
+            t("store.taskPackDesc"),
             e("b", null, expiry),
             "."
           ),
@@ -329,7 +330,7 @@ export function StoreModal({
               "button",
               {
                 className: "icon-button",
-                title: "DEV: conceder sem Stripe",
+                title: t("store.devGrant"),
                 onClick: async () => {
                   const tabId = storeTaskPackTabId ?? selectedTabId;
                   if (!tabId) return;
@@ -363,7 +364,7 @@ export function StoreModal({
       e(
         "div",
         { style: { marginTop: 12, fontSize: 12, opacity: 0.7 } },
-        "Upgrades comprados hoje expiram em ",
+        t("store.boughtToday"),
         e("b", null, expiry),
         "."
       )
@@ -451,7 +452,7 @@ export function UpgradesModal({ token, open, setOpen }) {
       e(
         "div",
         { style: { marginTop: 8, fontSize: 13, opacity: 0.8 } },
-        "Veja abaixo tudo que você já adquiriu e quando expira."
+        t("store.upgradesSub")
       ),
       e(
         "div",
@@ -476,18 +477,18 @@ export function UpgradesModal({ token, open, setOpen }) {
                 "b",
                 null,
                 u.type === "TAB_SLOT"
-                  ? "Aba extra"
-                  : `Pacote de tarefas (+${u.amount})`
+                  ? t("store.tabSlotShort")
+                  : t("store.taskPackShort", { n: u.amount })
               )
             ),
             e(
               "div",
               { style: { fontSize: 12, opacity: 0.9 } },
-              u.tab_name ? `Aba: ${u.tab_name}` : "Global",
-              " • Expira em ",
+              u.tab_name ? t("store.forTab", { name: u.tab_name }) : t("store.global"),
+              t("store.expires"),
               new Date(u.expires_at).toLocaleString(),
               " • ",
-              u.is_active ? "Ativo ✅" : "Expirado ❌"
+              u.is_active ? t("store.active") : t("store.expired")
             )
           )
         )

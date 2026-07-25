@@ -16,6 +16,8 @@ import {
 } from "./api.js";
 import { useDragTabs } from "./dragTabs.js";
 import { useDragTasks } from "./dragTasks.js";
+import { LANGS, lang, setLang, t } from "./i18n.js";
+import { InventoryView } from "./inventory.js";
 import { StoreModal, UpgradesModal } from "./store.js";
 import {
   e,
@@ -29,6 +31,77 @@ import {
 const GOOGLE_ON = !!(
   window.__GOOGLE_CLIENT_ID__ && !window.__GOOGLE_CLIENT_ID__.startsWith("%")
 );
+
+// Flag-only language picker. A native <select> can't render just an emoji flag
+// cleanly (it shows text and its popup is unstyled), so this is a small themed
+// popover: the trigger shows only the current flag; the open list shows each
+// flag beside its endonym so it stays usable.
+//
+// Flags are inline-SVG spans (`.flag .flag--<code>`), NOT emoji — Windows' Segoe
+// UI Emoji has no flag glyphs and renders "BR"/"ES" letters instead.
+const flagEl = (code) =>
+  e("span", { className: "flag flag--" + code, "aria-hidden": "true" });
+
+function LangMenu() {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  const current = LANGS.find((l) => l.code === lang()) || LANGS[0];
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (ev) => {
+      if (ref.current && !ref.current.contains(ev.target)) setOpen(false);
+    };
+    const onKey = (ev) => ev.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return e(
+    "div",
+    { className: "langmenu", ref },
+    e(
+      "button",
+      {
+        className: "langmenu__btn",
+        "aria-label": t("common.language"),
+        "aria-haspopup": "listbox",
+        "aria-expanded": open,
+        title: current.label,
+        onClick: () => setOpen((o) => !o),
+      },
+      flagEl(current.code),
+      e("i", { className: "ph-bold ph-caret-down langmenu__caret" })
+    ),
+    open &&
+      e(
+        "ul",
+        { className: "langmenu__list", role: "listbox" },
+        LANGS.map((l) =>
+          e(
+            "li",
+            { key: l.code, role: "option", "aria-selected": l.code === current.code },
+            e(
+              "button",
+              {
+                className: "langmenu__item" + (l.code === current.code ? " is-on" : ""),
+                onClick: () => {
+                  setOpen(false);
+                  setLang(l.code);
+                },
+              },
+              flagEl(l.code),
+              e("span", { className: "langmenu__label" }, l.label)
+            )
+          )
+        )
+      )
+  );
+}
 
 function App() {
   const [tasks, setTasks] = React.useState([]);
@@ -45,6 +118,13 @@ function App() {
   const [editingTitle, setEditingTitle] = React.useState("");
 
   const [billingCfg, setBillingCfg] = React.useState(null);
+
+  // "tasks" | "inventory" — the chosen view survives reloads so the app opens
+  // where you left it (the inventory is checked mid-packing, not from scratch).
+  const [view, setView] = React.useState(
+    () => localStorage.getItem("view") || "tasks"
+  );
+  React.useEffect(() => localStorage.setItem("view", view), [view]);
 
   // Store
   const [storeOpen, setStoreOpen] = React.useState(false);
@@ -73,13 +153,13 @@ function App() {
   }
   const [dialog, setDialog] = React.useState(null);
   const [dialogValue, setDialogValue] = React.useState("");
-  function askPrompt(titleTxt, message, defaultValue = "") {
+  function askPrompt(titleTxt, message, defaultValue = "", maxLength = TAB_NAME_MAX) {
     setDialogValue(defaultValue);
     return new Promise((resolve) =>
-      setDialog({ titleTxt, message, input: true, confirmLabel: "Save", resolve })
+      setDialog({ titleTxt, message, input: true, maxLength, confirmLabel: t("common.save"), resolve })
     );
   }
-  function askConfirm(titleTxt, message, confirmLabel = "Delete") {
+  function askConfirm(titleTxt, message, confirmLabel = t("common.delete")) {
     return new Promise((resolve) =>
       setDialog({ titleTxt, message, input: false, confirmLabel, danger: true, resolve })
     );
@@ -192,7 +272,7 @@ function App() {
     const paid = url.searchParams.get("paid");
     const canceled = url.searchParams.get("canceled");
     if (paid === "1") {
-      toast("Payment successful");
+      toast(t("task.paid"));
       setStoreOpen(false);
       fetchTabs();
       fetchTasks();
@@ -211,7 +291,7 @@ function App() {
       setStoreOpen(true);
       return;
     }
-    const name = await askPrompt("New tab", `Name your tab (max ${TAB_NAME_MAX} characters).`);
+    const name = await askPrompt(t("tab.new"), t("tab.nameIt", { max: TAB_NAME_MAX }));
     if (!name) return;
     const res = await apiCreateTab(token, name.slice(0, TAB_NAME_MAX));
     if (res.status === 402) {
@@ -222,47 +302,43 @@ function App() {
     }
     if (res.ok) {
       fetchTabs();
-      toast("Tab created");
+      toast(t("tab.created"));
     } else {
       const d = await res.json().catch(() => ({}));
-      toast(d.error || "Couldn't create the tab", "error");
+      toast(d.error || t("tab.errCreate"), "error");
     }
   }
 
   async function beginRenameTab(tab) {
     const current = tab.name || "";
-    const newName = await askPrompt("Rename tab", `Up to ${TAB_NAME_MAX} characters.`, current);
+    const newName = await askPrompt(t("tab.rename"), t("tab.upTo", { max: TAB_NAME_MAX }), current);
     if (newName == null) return;
     const trimmed = newName.trim();
     if (!trimmed || trimmed === current) return;
     if (trimmed.length > TAB_NAME_MAX) {
-      toast(`Tab name must be ${TAB_NAME_MAX} characters or fewer`, "error");
+      toast(t("tab.tooLong", { max: TAB_NAME_MAX }), "error");
       return;
     }
     const res = await apiRenameTab(token, tab.id, trimmed);
     if (res.ok) fetchTabs();
     else {
       const d = await res.json().catch(() => ({}));
-      toast(d.error || "Couldn't rename the tab", "error");
+      toast(d.error || t("tab.errRename"), "error");
     }
   }
 
   async function onDeleteTab(tabId) {
-    const ok = await askConfirm(
-      "Delete tab?",
-      "This deletes the tab and every task in it. This can't be undone.",
-      "Delete tab"
-    );
+    const ok = await askConfirm(t("tab.deleteQ"), t("tab.deleteMsg"), t("tab.delete"));
     if (!ok) return;
     const res = await apiDeleteTab(token, tabId);
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      toast(d.error || "Couldn't delete the tab", "error");
+      toast(d.error || t("tab.errDelete"), "error");
       return;
     }
     if (selectedTabId === tabId) setSelectedTabId(null);
     await fetchTabs();
-    toast("Tab deleted");
+    toast(t("tab.deleted"));
   }
 
   async function addTask() {
@@ -280,7 +356,7 @@ function App() {
   }
 
   async function deleteTask(id) {
-    const ok = await askConfirm("Delete task?", "This can't be undone.");
+    const ok = await askConfirm(t("task.deleteQ"), t("task.deleteMsg"));
     if (!ok) return;
     await apiDeleteTask(token, id);
     fetchTasks();
@@ -317,20 +393,20 @@ function App() {
 
     if (isRegister) {
       if (!validateUsername(username)) {
-        toast("Username must be 3–30 characters (letters, numbers, _)", "error");
+        toast(t("auth.badUsername"), "error");
         return;
       }
       const s = passwordStrength(password);
       if (!s.ok) {
-        toast("Password needs upper- and lowercase, a number, and a symbol (min 8)", "error");
+        toast(t("auth.badPassword"), "error");
         return;
       }
       if (password !== confirmPassword) {
-        toast("Passwords don't match", "error");
+        toast(t("auth.mismatch"), "error");
         return;
       }
       if (!acceptLegal) {
-        toast("Please accept the Terms and Privacy Policy", "error");
+        toast(t("auth.mustAccept"), "error");
         return;
       }
     }
@@ -352,7 +428,7 @@ function App() {
       setPassword("");
       setConfirmPassword("");
       setAcceptLegal(false);
-    } else toast(d.error || "Something went wrong. Try again.", "error");
+    } else toast(d.error || t("common.oops"), "error");
   }
 
   const handleCredentialResponse = async (response) => {
@@ -366,7 +442,7 @@ function App() {
       localStorage.setItem("token", d.token);
       setToken(d.token);
       fetchTabs();
-    } else toast(d.error || "Google sign-in failed", "error");
+    } else toast(d.error || t("auth.googleFailed"), "error");
   };
 
   // Render the real Google button once GIS is ready and a client id was injected.
@@ -389,6 +465,9 @@ function App() {
           text: "continue_with",
           shape: "pill",
           width: 320,
+          // Without this Google picks its own locale and the button ends up in a
+          // different language than the page it sits on.
+          locale: lang(),
         });
       } else if (++tries > 40) {
         clearInterval(iv);
@@ -411,6 +490,9 @@ function App() {
   const passInfo = passwordStrength(password);
   const segCount =
     passInfo.score >= 4 ? 3 : passInfo.score >= 2 ? 2 : passInfo.score >= 1 ? 1 : 0;
+
+  // Same picker on the auth screen and in the app bar.
+  const langPicker = e(LangMenu, {});
 
   // ---- shared overlays (toasts + dialog) ----
   const overlays = e(
@@ -447,7 +529,7 @@ function App() {
               ? e("input", {
                   autoFocus: true,
                   value: dialogValue,
-                  maxLength: TAB_NAME_MAX,
+                  maxLength: dialog.maxLength ?? TAB_NAME_MAX,
                   onChange: (ev) => setDialogValue(ev.target.value),
                   onKeyDown: (ev) => {
                     if (ev.key === "Enter") closeDialog(true);
@@ -460,7 +542,7 @@ function App() {
               e(
                 "button",
                 { className: "btn btn--ghost", onClick: () => closeDialog(false) },
-                "Cancel"
+                t("common.cancel")
               ),
               e(
                 "button",
@@ -488,15 +570,25 @@ function App() {
           "div",
           { className: "auth__brand" },
           e("i", { className: "ph-bold ph-check-circle mark" }),
-          e("span", { className: "auth__wordmark" }, "To do")
+          e("span", { className: "auth__wordmark" }, "To do"),
+          // sits on the same baseline as the wordmark, flush to the card's right
+          // edge — no more box floating in dead space above the title
+          e("div", { className: "auth__brandlang" }, langPicker)
         ),
         e(
           "h2",
           { className: "auth__title" },
-          isRegister ? "Create account" : e(React.Fragment, null, "Welcome ", e("span", { className: "accent" }, "back"))
+          isRegister
+            ? t("auth.createAccount")
+            : e(
+                React.Fragment,
+                null,
+                t("auth.welcome") + " ",
+                e("span", { className: "accent" }, t("auth.welcomeAccent"))
+              )
         ),
         e("input", {
-          placeholder: "Username",
+          placeholder: t("auth.username"),
           maxLength: 50,
           value: username,
           ref: usernameRef,
@@ -510,7 +602,7 @@ function App() {
         e("input", {
           type: "password",
           maxLength: 72,
-          placeholder: "Password",
+          placeholder: t("auth.password"),
           autoComplete: isRegister ? "new-password" : "current-password",
           value: password,
           onChange: (ev) => setPassword(ev.target.value),
@@ -531,14 +623,18 @@ function App() {
           e(
             "div",
             { className: "pw-hint" },
-            "Strength: ",
-            e("b", null, passInfo.label),
-            passInfo.ok ? "" : ` — missing ${passInfo.reasons.join(", ")}`
+            t("auth.strength"),
+            e("b", null, t("pw." + passInfo.label)),
+            passInfo.ok
+              ? ""
+              : t("auth.missing", {
+                  reasons: passInfo.reasons.map((r) => t("pw." + r)).join(", "),
+                })
           ),
         isRegister &&
           e("input", {
             type: "password",
-            placeholder: "Confirm password",
+            placeholder: t("auth.confirmPassword"),
             value: confirmPassword,
             onChange: (ev) => setConfirmPassword(ev.target.value),
             onKeyDown: (ev) => {
@@ -558,20 +654,20 @@ function App() {
             e(
               "span",
               null,
-              "I agree to the ",
-              e("a", { href: "/legal/terms.html", target: "_blank" }, "Terms"),
-              " and ",
-              e("a", { href: "/legal/privacy.html", target: "_blank" }, "Privacy Policy"),
+              t("auth.agreePre"),
+              e("a", { href: "/legal/terms.html", target: "_blank" }, t("auth.terms")),
+              t("auth.agreeMid"),
+              e("a", { href: "/legal/privacy.html", target: "_blank" }, t("auth.privacy")),
               "."
             )
           ),
         e(
           "button",
           { onClick: handleAuth, className: "btn btn--primary" },
-          isRegister ? "Create account" : "Sign in"
+          isRegister ? t("auth.createAccount") : t("auth.signIn")
         ),
         GOOGLE_ON &&
-          e("div", { className: "auth__sep" }, "or"),
+          e("div", { className: "auth__sep" }, t("common.or")),
         GOOGLE_ON &&
           e("div", { className: "auth__google", ref: googleBtnRef }),
         e(
@@ -580,7 +676,7 @@ function App() {
             onClick: () => setIsRegister(!isRegister),
             className: "btn btn--ghost",
           },
-          isRegister ? "Have an account? Sign in" : "New here? Create account"
+          isRegister ? t("auth.haveAccount") : t("auth.newHere")
         )
       ),
       overlays
@@ -615,10 +711,10 @@ function App() {
               {
                 id: "install-btn",
                 className: "iconbtn iconbtn--label",
-                title: "Install app",
+                title: t("app.installApp"),
               },
               e("i", { className: "ph-bold ph-download-simple" }),
-              e("span", { className: "label" }, "Install")
+              e("span", { className: "label" }, t("app.install"))
             ),
           e(
             "button",
@@ -630,7 +726,7 @@ function App() {
                 setStoreOpen(true);
               },
               className: "iconbtn",
-              title: "Store",
+              title: t("app.store"),
             },
             e("i", { className: "ph-bold ph-coins" })
           ),
@@ -639,19 +735,63 @@ function App() {
             {
               onClick: () => setUpgOpen(true),
               className: "iconbtn",
-              title: "My upgrades",
+              title: t("app.upgrades"),
             },
             e("i", { className: "ph-bold ph-list-bullets" })
           ),
           e(
             "button",
-            { onClick: logout, className: "iconbtn iconbtn--danger", title: "Log out" },
+            { onClick: logout, className: "iconbtn iconbtn--danger", title: t("app.logout") },
             e("i", { className: "ph-bold ph-sign-out" })
           )
         )
       ),
 
+      // view switch + language, on their own row: the app bar is already five
+      // controls wide on a phone and the picker was overlapping the wordmark.
+      e(
+        "div",
+        { className: "viewbar" },
+      e(
+        "div",
+        { className: "viewswitch", role: "tablist" },
+        e(
+          "button",
+          {
+            className: "viewswitch__btn" + (view === "tasks" ? " is-on" : ""),
+            role: "tab",
+            "aria-selected": view === "tasks",
+            onClick: () => setView("tasks"),
+          },
+          e("i", { className: "ph-bold ph-check-square" }),
+          " " + t("app.tasks")
+        ),
+        e(
+          "button",
+          {
+            className: "viewswitch__btn" + (view === "inventory" ? " is-on" : ""),
+            role: "tab",
+            "aria-selected": view === "inventory",
+            onClick: () => setView("inventory"),
+          },
+          e("i", { className: "ph-bold ph-suitcase-rolling" }),
+          " " + t("app.inventory")
+        )
+      ),
+        langPicker
+      ),
+
+      view === "inventory" &&
+        e(InventoryView, {
+          token,
+          toast,
+          askPrompt,
+          askConfirm,
+          onUnauth: logout,
+        }),
+
       // tabs
+      view === "tasks" &&
       e(
         "div",
         { className: "tabs-track" },
@@ -681,15 +821,16 @@ function App() {
             className: "tab tab--new",
             onClick: createTab,
             onMouseMove: handleGlowMove,
-            title: "New tab",
+            title: t("tab.new"),
           },
           e("i", { className: "ph-bold ph-plus" }),
-          " New tab"
+          " " + t("tab.new")
         )
       ),
 
       // long-press tab menu
-      tabMenuTargetId &&
+      view === "tasks" &&
+        tabMenuTargetId &&
         e(
           "div",
           { className: "tabmenu", onClick: () => setTabMenuTargetId(null) },
@@ -707,7 +848,7 @@ function App() {
               "button",
               {
                 className: "iconbtn",
-                title: "Rename tab",
+                title: t("tab.rename"),
                 onClick: () => {
                   const tab = tabs.find((t) => t.id === tabMenuTargetId);
                   setTabMenuTargetId(null);
@@ -720,7 +861,7 @@ function App() {
               "button",
               {
                 className: "iconbtn iconbtn--danger",
-                title: "Delete tab",
+                title: t("tab.delete"),
                 onClick: () => {
                   const id = tabMenuTargetId;
                   setTabMenuTargetId(null);
@@ -733,7 +874,7 @@ function App() {
               "button",
               {
                 className: "iconbtn",
-                title: `Buy +${billingCfg?.task_pack_size ?? 6} tasks`,
+                title: t("tab.buyTasks", { n: billingCfg?.task_pack_size ?? 6 }),
                 onClick: () => {
                   setStoreTaskPackTabId(tabMenuTargetId);
                   setTabMenuTargetId(null);
@@ -748,6 +889,7 @@ function App() {
         ),
 
       // composer (new task)
+      view === "tasks" &&
       e(
         "div",
         { className: "composer" },
@@ -759,13 +901,13 @@ function App() {
           onKeyDown: (ev) => {
             if (ev.key === "Enter") addTask();
           },
-          placeholder: "Add a task…",
+          placeholder: t("task.add"),
         }),
         e(
           "button",
           {
             onClick: addTask,
-            title: "Add task",
+            title: t("task.addTitle"),
             className: "btn btn--primary composer__add",
             disabled: !selectedTabId,
           },
@@ -774,7 +916,8 @@ function App() {
       ),
 
       // task list OR empty state
-      taskArr.length
+      view === "tasks" &&
+        (taskArr.length
         ? e(
             "ul",
             { className: "tasklist" },
@@ -791,7 +934,7 @@ function App() {
                     cursor: isDraggingTasks ? "grabbing" : "grab",
                     opacity: draggingTaskId === task.id ? 0.85 : 1,
                   },
-                  title: "Drag to reorder",
+                  title: t("task.drag"),
                 },
                 // neon checkbox (signature — unchanged markup)
                 e(
@@ -864,7 +1007,7 @@ function App() {
                           "button",
                           {
                             className: "iconbtn",
-                            title: "Save",
+                            title: t("common.save"),
                             onMouseDown: (ev) => ev.preventDefault(),
                             onClick: saveTaskTitle,
                           },
@@ -888,7 +1031,7 @@ function App() {
                   "button",
                   {
                     onClick: () => deleteTask(task.id),
-                    title: "Delete task",
+                    title: t("task.delete"),
                     className: "iconbtn iconbtn--danger",
                   },
                   e("i", { className: "ph-bold ph-trash" })
@@ -900,15 +1043,13 @@ function App() {
             "div",
             { className: "empty" },
             e("i", { className: "ph-bold ph-check-circle empty__mark" }),
-            e("div", { className: "empty__title" }, "No tasks yet"),
+            e("div", { className: "empty__title" }, t("task.empty")),
             e(
               "div",
               { className: "empty__hint" },
-              selectedTabId
-                ? "Add your first one below."
-                : "Create a tab to get started."
+              selectedTabId ? t("task.emptyHint") : t("task.emptyNoTab")
             )
-          )
+          ))
     ),
 
     e(StoreModal, {

@@ -112,6 +112,64 @@ export async function fakeGrant(token, actionType, tabId) {
   return res;
 }
 
+/* ---- inventory: what's at which place ---------------------------------- */
+
+export async function fetchInventory(token) {
+  const r = await fetch("/api/inventory", { headers: authHeaders(token) });
+  if (r.status === 401) throw new Error("unauth");
+  return r.json();
+}
+
+const jsonPost = (token, url, body, method = "POST") =>
+  fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(body),
+  });
+
+export async function createLocation(token, name) {
+  return jsonPost(token, "/api/inventory/locations", { name });
+}
+
+export async function renameLocation(token, id, name) {
+  return jsonPost(token, `/api/inventory/locations/${id}`, { name }, "PUT");
+}
+
+export async function deleteLocation(token, id) {
+  return fetch(`/api/inventory/locations/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
+export async function addItem(token, item) {
+  return jsonPost(token, "/api/inventory/items", item);
+}
+
+export async function updateItem(token, id, patch) {
+  return jsonPost(token, `/api/inventory/items/${id}`, patch, "PUT");
+}
+
+export async function deleteItem(token, id) {
+  return fetch(`/api/inventory/items/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+}
+
+/** The central operation: relocate items and record it in the history. */
+export async function moveItems(token, itemIds, toLocationId) {
+  return jsonPost(token, "/api/inventory/move", { itemIds, toLocationId });
+}
+
+export async function fetchMoves(token, limit = 40) {
+  const r = await fetch(`/api/inventory/moves?limit=${limit}`, {
+    headers: authHeaders(token),
+  });
+  if (r.status === 401) throw new Error("unauth");
+  return r.json();
+}
+
 export async function myEntitlements(token) {
   const r = await fetch("/api/billing/my-entitlements", {
     headers: authHeaders(token),

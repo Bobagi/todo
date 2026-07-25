@@ -3,7 +3,7 @@
 // Stale-while-revalidate para demais assets.
 // Força ativação imediata + coopera com pwa.js para SKIP_WAITING.
 
-const VERSION = "v6"; // bump quando quiser forçar update
+const VERSION = "v12"; // bump (v12 = bandeiras SVG, funcionam no Windows)
 const CACHE_NAME = "todo-cache-" + VERSION;
 
 const CORE_URLS = [

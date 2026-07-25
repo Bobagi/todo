@@ -223,7 +223,10 @@ button:active {
 }
 
 /* ---- inputs ------------------------------------------------------------- */
-input {
+/* select is included so dropdowns don't fall back to the browser's white
+   chrome on this dark surface */
+input,
+select {
   font-family: inherit;
   font-size: 1rem;
   color: var(--text);
@@ -235,7 +238,8 @@ input {
 input::placeholder {
   color: var(--text-faint);
 }
-input:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(245, 197, 49, 0.15);
@@ -259,6 +263,9 @@ input[type="checkbox"] {
   align-items: center;
   gap: 0.55rem;
   margin-bottom: 0.3rem;
+}
+.auth__brandlang {
+  margin-left: auto; /* pushes the flag to the card's right edge, aligned with the inputs */
 }
 .auth__brand .mark {
   color: var(--gold);
@@ -666,6 +673,427 @@ input[type="checkbox"] {
 }
 .modal__actions .btn {
   flex: 1;
+}
+
+/* ---- flags: inline SVG, NOT emoji ----------------------------------------
+   Windows' Segoe UI Emoji has no flag glyphs (it renders "BR"/"ES" letters),
+   so emoji flags break on Windows Chrome. These SVGs render identically on
+   every OS. */
+.flag {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.flag--pt { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2030%2021'%3E%3Cpath%20fill%3D'%23009B3A'%20d%3D'M0%200h30v21H0z'%2F%3E%3Cpath%20fill%3D'%23FEDF00'%20d%3D'M15%202%2028%2010.5%2015%2019%202%2010.5z'%2F%3E%3Ccircle%20cx%3D'15'%20cy%3D'10.5'%20r%3D'4.6'%20fill%3D'%23002776'%2F%3E%3C%2Fsvg%3E"); }
+.flag--en { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2026%2014'%3E%3Cpath%20fill%3D'%23fff'%20d%3D'M0%200h26v14H0z'%2F%3E%3Cg%20fill%3D'%23B22234'%3E%3Cpath%20d%3D'M0%200h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%202.15h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%204.31h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%206.46h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%208.62h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%2010.77h26v1.08H0z'%2F%3E%3Cpath%20d%3D'M0%2012.92h26v1.08H0z'%2F%3E%3C%2Fg%3E%3Cpath%20fill%3D'%233C3B6E'%20d%3D'M0%200h10.4v7.54H0z'%2F%3E%3C%2Fsvg%3E"); }
+.flag--es { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%203%202'%3E%3Cpath%20fill%3D'%23AA151B'%20d%3D'M0%200h3v2H0z'%2F%3E%3Cpath%20fill%3D'%23F1BF00'%20d%3D'M0%20.5h3v1H0z'%2F%3E%3C%2Fsvg%3E"); }
+.flag--fr { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%203%202'%3E%3Cpath%20fill%3D'%23fff'%20d%3D'M0%200h3v2H0z'%2F%3E%3Cpath%20fill%3D'%230055A4'%20d%3D'M0%200h1v2H0z'%2F%3E%3Cpath%20fill%3D'%23EF4135'%20d%3D'M2%200h1v2H2z'%2F%3E%3C%2Fsvg%3E"); }
+.flag--de { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%205%203'%3E%3Cpath%20fill%3D'%23000'%20d%3D'M0%200h5v1H0z'%2F%3E%3Cpath%20fill%3D'%23D00'%20d%3D'M0%201h5v1H0z'%2F%3E%3Cpath%20fill%3D'%23FFCE00'%20d%3D'M0%202h5v1H0z'%2F%3E%3C%2Fsvg%3E"); }
+.flag--it { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%203%202'%3E%3Cpath%20fill%3D'%23fff'%20d%3D'M0%200h3v2H0z'%2F%3E%3Cpath%20fill%3D'%23009246'%20d%3D'M0%200h1v2H0z'%2F%3E%3Cpath%20fill%3D'%23CE2B37'%20d%3D'M2%200h1v2H2z'%2F%3E%3C%2Fsvg%3E"); }
+
+/* ---- language picker (flag-only trigger + themed popover) ---------------
+   Trigger deliberately mirrors .iconbtn (same 42px height, --line-hi border,
+   --surface fill, --radius-sm) so it reads as one of the app-bar controls,
+   not a floating pill. */
+.langmenu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.langmenu__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 42px;
+  padding: 0 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+}
+.langmenu__btn:hover,
+.langmenu__btn[aria-expanded="true"] {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--surface-hi);
+}
+/* the flag inside the trigger inherits .flag sizing */
+.langmenu__caret {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  transition: transform 0.16s ease;
+}
+.langmenu__btn[aria-expanded="true"] .langmenu__caret {
+  transform: rotate(180deg);
+  color: var(--gold);
+}
+.langmenu__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 2200;
+  min-width: 180px;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: var(--surface-hi);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: task-in 0.14s ease both;
+}
+.langmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+}
+.langmenu__item:hover {
+  background: rgba(245, 197, 49, 0.1);
+  color: var(--gold);
+}
+.langmenu__item.is-on {
+  color: var(--gold);
+  background: rgba(245, 197, 49, 0.08);
+}
+.langmenu__item .flag {
+  width: 1.5rem;
+  height: 1rem;
+}
+.langmenu__label {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   INVENTORY — "what's at which place"
+   Reuses the cabinet vocabulary: place chips are tabs, items are task rows.
+   The one new idea is the move bar, which only exists while something is picked.
+   ========================================================================== */
+
+/* view switch + language picker share one row */
+.viewbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: var(--sp4);
+}
+.viewbar .viewswitch {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* segmented switch between the two halves of the app */
+.viewswitch {
+  display: flex;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.25rem;
+  margin-bottom: var(--sp4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+}
+.viewswitch__btn {
+  flex: 1;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.16s, background 0.16s;
+}
+.viewswitch__btn:hover {
+  color: var(--gold);
+}
+.viewswitch__btn.is-on {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: var(--glow);
+}
+
+/* item count baked into a place chip */
+.tab__count {
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--pill);
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.tab--active .tab__count {
+  background: rgba(23, 17, 10, 0.22);
+}
+
+.inv__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: var(--sp3);
+}
+.inv__hint {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+.inv__bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+.inv__loading {
+  padding: 2rem 0;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.composer__select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+}
+
+/* select-all header row: the checkbox reuses .inv-pick; the label is a plain
+   text button so tapping either toggles all visible items */
+.inv__selall {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: var(--sp3);
+}
+.inv__selall-label {
+  padding: 0.3rem 0.2rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+}
+.inv__selall-label:hover,
+.inv__selall .inv-pick:hover + .inv__selall-label {
+  color: var(--gold);
+}
+
+/* The move bar: a contextual action bar that takes over the bottom dock while
+   items are selected, so it's ALWAYS on screen — no scrolling back up to move.
+   Mirrors the composer's fixed-dock treatment on phones and stays inside the
+   centered column on desktop. */
+.selbar {
+  margin-bottom: var(--sp4);
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: var(--glow);
+  animation: task-in 0.18s ease both;
+}
+.selbar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+.selbar__count {
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.selbar__clear {
+  width: 34px;
+  height: 34px;
+  font-size: 1rem;
+}
+.selbar__targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  /* many places scroll here instead of growing the bar off-screen */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.selbar__label {
+  flex: 0 0 100%; /* own line, above the destination buttons */
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.selbar__target {
+  flex: 1 1 140px;
+  padding: 0.6rem 0.7rem;
+}
+/* reserve room so the last item never hides behind the fixed move bar */
+.inv__dock-spacer {
+  height: 200px;
+}
+/* Fixed dock — same treatment the composer already uses on phones, extended to
+   every width for the move bar so it never scrolls out of reach. */
+.selbar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(440px, 100%);
+  margin: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 0.7rem calc(env(safe-area-inset-right) + 0.9rem)
+    calc(env(safe-area-inset-bottom) + 0.7rem)
+    calc(env(safe-area-inset-left) + 0.9rem);
+  z-index: 1000;
+}
+
+/* item rows: task chrome, but they don't drag */
+.inv-item {
+  cursor: default;
+}
+.inv-item--sel {
+  border-left-color: var(--gold);
+  background: var(--surface-hi);
+}
+/* selection toggle — the 40px square is the tap target; the visible control is
+   a 22px box that is EMPTY when off and a gold check when on. The check only
+   exists in the DOM when selected (see inventory.js), so an unselected box can
+   never show a stray checkmark. */
+.inv-pick {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+.inv-pick::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line-hi);
+  border-radius: 6px;
+  background: transparent;
+  transition: background 0.14s, border-color 0.14s;
+}
+.inv-pick:hover::before {
+  border-color: var(--gold);
+}
+.inv-pick--on::before {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.inv-pick__check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.inv-item__icon {
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+  color: var(--gold-deep);
+}
+.inv-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: text;
+}
+.inv-item__qty {
+  margin-left: 0.35rem;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.inv-item__sub {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+.inv-edit__row {
+  display: flex;
+  gap: 0.4rem;
+}
+.inv-edit__row input,
+.inv-edit__row select {
+  min-width: 0;
+}
+.inv-edit__row input[type="text"] {
+  flex: 1 1 auto;
+}
+.inv-edit__qty {
+  flex: 0 0 auto;
+  width: 68px;
+}
+.inv-edit__notes {
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+/* lists inside modals */
+.placelist,
+.histlist {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.placelist__row,
+.histlist__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.placelist__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+.placelist__count,
+.histlist__when {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+.histlist__item {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+.histlist__move {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.histlist__move i {
+  color: var(--gold-deep);
+}
+
+.empty__cta {
+  margin-top: 1rem;
 }
 
 [hidden] {

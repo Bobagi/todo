@@ -1,7 +1,8 @@
 # CLAUDE.md — `todo` (todo.bobagi.space)
 
 > **PWA de lista de tarefas** com abas, arrastar‑e‑soltar, contas (usuário+senha / Google
-> preparado) e uma **monetização via Stripe** (comprar aba extra / pacote de tarefas, com
+> preparado), um **inventário "o que está em qual casa"** (ver seção *Inventário*) e uma
+> **monetização via Stripe** (comprar aba extra / pacote de tarefas, com
 > validade de 30 dias). Roda neste VPS como container Docker atrás do nginx+Cloudflare.
 > Dono: Gustavo Perin / Bobagi. Repo público: **github.com/Bobagi/todo**.
 >
@@ -42,16 +43,22 @@ server/migrations.js          # runMigrations() (no-op se não houver /migration
 server/routes/auth.js         # /register /login /google-login (+ access_logs, regras de senha)
 server/routes/tabs.js         # CRUD de abas + /tabs/capacity + reorder (checa limite de billing)
 server/routes/tasks.js        # CRUD de tarefas + reorder (checa limite de billing)
+server/routes/inventory.js    # inventário: locais, itens, /move (o coração) e histórico
 server/routes/billing.js      # /billing/config /checkout /my-entitlements + /fake-grant (DEV)
 server/billing/config.js      # billing_config (defaults: 1 aba, 6 tarefas/aba, R$2, 30 dias)
 server/billing/limits.js      # getAllowedTabSlots / getAllowedTasksForTab (base + entitlements ativos)
 server/billing/webhook.js     # checkout.session.completed → grava payment + entitlement
 public/index.html             # shell da PWA + <script> CDN (React/Phosphor/Google/Umami)
-public/js/app/main.js         # App React inteiro (auth, abas, tarefas, loja)
+public/js/app/main.js         # App React inteiro (auth, switch de visão, abas, tarefas, loja)
+public/js/app/inventory.js    # seção Inventory (locais, itens, barra de mala, histórico)
+public/js/app/i18n.js         # EN/PT/ES: dicionários + t() + detecção automática
 public/js/app/{api,store,about,dragTabs,dragTasks,utils}.js
 public/{manifest.json,service-worker.js,style.css,neon-checkbox.css}
 public/legal/{terms,privacy}.html   # Termos + Privacidade versionados (v1), aceite server-side
-prisma/migrations/*/migration.sql   # schema real (users, tabs, tasks, entitlements, payments, billing_config, access_logs)
+prisma/migrations/*/migration.sql   # schema real (users, tabs, tasks, entitlements, payments, billing_config, access_logs, inv_*)
+test/inventory.test.js        # suíte node:test do inventário (IDOR, race, clamps, histórico)
+test/i18n.test.js             # paridade dos dicionários + detecção + chaves usadas de verdade
+test/helpers/harness.js       # cria banco descartável + sobe o app real numa porta efêmera
 get_codes.py                  # util DEV: concatena .js/.css num único .txt (o commit "codes reader" é enganoso)
 deploy.sh                     # build + up -d + health check (one-command deploy)
 ```
@@ -65,9 +72,15 @@ deploy.sh                     # build + up -d + health check (one-command deploy
 - **Migrations:** rodam sozinhas no boot do container (entrypoint). Novo SQL → nova pasta
   `prisma/migrations/<ordem>_nome/migration.sql`.
 - **Stripe local:** `stripe listen --forward-to http://localhost:3051/api/billing/webhook`.
-- **`npm test`**: era um footgun (`docker compose down -v` **apagava o volume do banco** + `npm build`
-  inválido). Neutralizado 2026-07-15 para um placeholder não-destrutivo. **Ainda não há testes** —
-  usar `test-forge` (priorizar auth/limites) quando quiser travar comportamento.
+- **Testes (desde 2026‑07‑23):** `docker compose run --rm --entrypoint npm web test` → `node --test`.
+  **23 testes** cobrindo o inventário e a i18n (IDOR entre contas, atomicidade dos limites sob concorrência,
+  clamps casados às colunas, idempotência do move + histórico). O harness (`test/helpers/harness.js`)
+  **cria um banco descartável `todo_test`** (drop+create+replay das migrations) e sobe o app real numa
+  porta efêmera — **nunca toca no banco de produção**. Para isso o `server.js` passou a exportar `app` e
+  só chamar `start()` quando é o entrypoint (`require.main === module`).
+  ⚠️ O container serve o código da **imagem** (`COPY . .`): depois de editar, **rebuild** (`docker
+  compose build web`) antes de testar/revisar, senão você valida a versão velha.
+  Tasks/abas/billing **ainda não têm teste** — usar `test-forge` quando mexer neles.
 
 ## Portas & rede (pós‑hardening deste box)
 - **web** → publicado em **`127.0.0.1:${WEB_PORT}` (3051)**; nginx `todo.bobagi.space`
@@ -112,6 +125,109 @@ CoinHub — todo já tinha esse fluxo 90% pronto; só faltava um client id real 
   nome do projeto CoinHub — se quiser separação, criar um client dedicado e trocar o `GOOGLE_CLIENT_ID`
   (é 1 env var).
 
+## Inventário — "o que está em qual casa" (feito 2026‑07‑23)
+Segunda metade do app, atrás do switch **Tasks ⟷ Inventory** no topo (a visão escolhida persiste em
+`localStorage['view']`). **Origem:** o operador visita a namorada em outra cidade, deixa roupa lá e
+não lembra o que já levou. Pesquisamos o mercado (Sortly, HomeBox, Our Kidz Clozet, apps de packing)
+e a conclusão foi que o problema **não é lista de mala, é inventário com duas localizações** — o
+HomeBox (Go+Vue, AGPL) resolve isso mas é um app separado, então implementamos a funcionalidade aqui.
+
+- **Modelo:** `inv_locations` (locais do usuário, máx. **12**), `inv_items` (item = **um** lugar por
+  vez, máx. **500**), `inv_moves` (histórico; `item_name`/`from_name`/`to_name` são
+  **desnormalizados** para o histórico sobreviver ao delete do item/local).
+- **Mover é a operação central:** marca N itens → toca no destino → `POST /api/inventory/move` troca
+  todos numa transação (`SELECT … FOR UPDATE`) e grava o histórico. **Idempotente:** mover para onde
+  já está devolve `moved:0` e **não** escreve histórico fantasma.
+- **`PUT /inventory/items/:id` NÃO muda `location_id` de propósito** — se mudasse, dava para relocar
+  sem passar pelo histórico. Um teste trava isso.
+- **Apagar um local NÃO apaga os itens** (`ON DELETE SET NULL`): eles viram "Somewhere unknown" e
+  aparecem num chip próprio. A resposta do DELETE devolve `orphaned: N`.
+- **Categorias:** a API devolve a LISTA (`key` + ícone Phosphor); o rótulo é traduzido no cliente
+  (`t("cat." + key)`) — ver a seção de i18n.
+- **Criar lugar tem DOIS caminhos** (pedido do operador 2026‑07‑23): o chip **"+ Novo lugar"** ao lado
+  dos chips de lugar (espelha o "New tab" das tarefas) **e** o botão ⚙ *Lugares* na barra de
+  ferramentas, que abre o modal de gerenciar (renomear/excluir). O chip fica dentro da faixa que rola —
+  por isso o ⚙ continua existindo como porta sempre visível.
+- **Fora do billing:** inventário é livre; os limites acima são guardrail anti‑poluição, não venda.
+  Os dois usam **`pg_advisory_xact_lock` por usuário** (`withUserLock`), porque `SELECT COUNT` →
+  `INSERT` **é race** — 40 requests concorrentes criaram 40 locais com limite 12 antes do fix.
+- **`server.js` ganhou um error handler** que responde 500 genérico (o handler default do Express
+  **serializa o stack trace** quando `NODE_ENV` não é `production`, que é o caso aqui) e trata o
+  `SyntaxError` do `express.json()` como **400**.
+- **Selecionar tudo (2026‑07‑23):** linha de cabeçalho `.inv__selall` acima da lista (quando há ≥2
+  itens) com um checkbox `.inv-pick` + rótulo "Selecionar tudo". Estados: vazio (nada) → traço
+  `ph-minus` / `aria-checked="mixed"` (parcial) → ✓ (todos). **Escopo por lugar:** seleciona só os itens
+  VISÍVEIS (`shown`, respeita o filtro de lugar) — mesma regra do `switchPlace` que limpa a seleção ao
+  trocar de lugar. Substituiu a dica `inv.pickHint` (removida dos 6 dicts — a linha rotulada já ensina
+  que as caixas selecionam).
+- **Seleção múltipla / mover (refeito 2026‑07‑23 a pedido do operador):** o "quadrado branco" (antes
+  um `<input type=checkbox>` nativo, confuso) virou um **botão de seleção** claro (`.inv-pick`,
+  `role=checkbox`, caixa que enche de dourado + check, alvo de 40px). A barra "Mover para" agora é uma
+  **barra de ação fixa no rodapé** (`.selbar`, `position:fixed`) que aparece só com seleção e **some o
+  composer** enquanto seleciona — assim fica sempre visível por mais que a lista role (antes ficava no
+  topo e saía da tela). Um espaçador (`.inv__dock-spacer`, 200px) impede a barra de cobrir o último item;
+  os destinos rolam (`max-height:40vh`) se houver muitos lugares. Dica de descoberta (`inv.pickHint`)
+  aparece quando há ≥2 itens e nada selecionado. Servidor inalterado — mesmo `POST /inventory/move`
+  (idempotente, atômico) já coberto pelos testes.
+- **Qualidade fechada nesta sessão:** `security-sweep` (relatório em
+  `.claude/security-sweep/20260723-inventory/` — 1 P1 race + 1 P2 corrigidos e re‑testados; IDOR/SQLi/
+  bounds/XSS testados ao vivo e limpos), `test-forge` (15 testes, 3 mutation checks vermelhos) e
+  `frontend-review` (`.claude/frontend-review/20260723-inventory/` — 1 P1 + 2 P2 corrigidos).
+
+## i18n — 6 idiomas com detecção automática (feito 2026‑07‑23; ampliado no mesmo dia)
+`public/js/app/i18n.js`: um dicionário por idioma + `t("chave", {vars})` com interpolação `{var}`.
+**Idiomas:** PT, EN, ES, FR, DE, IT — 173 chaves cada, paridade travada em teste. **Ordem do dropdown =
+`LANGS` (não é critério — é ordem de exibição): PT primeiro** (pedido do operador; antes o EN liderava só
+por ser o fallback). Detecção não depende dessa ordem; o **fallback** (browser sem idioma suportado)
+segue **`en`** de propósito (default internacional mais seguro que PT p/ um browser 100% em outra língua).
+FR/DE/IT foram os idiomas escolhidos por serem os que dá pra traduzir com qualidade verificável (não
+inventar CJK/RTL sem revisão). Adicionar idioma = 1 código em `SUPPORTED` + 1 entrada em `LANGS` + 1 dict.
+- **Detecção:** escolha salva em `localStorage['lang']` → 1º idioma suportado em `navigator.languages`
+  (cobre "de,es,en" → es) → **`en`** como default. Trocar idioma **recarrega a página** (mesmo padrão
+  do warframe‑farm‑helper; nada aqui precisa re‑renderizar ao vivo e o reload mantém coerente até o
+  texto capturado em callback). Valor hostil no `localStorage` cai no default (allowlist `SUPPORTED`).
+- **Cobertura:** auth, appbar, switch de visão, abas/tarefas, inventário inteiro, modais de about e
+  **a loja** (que estava em PT solto) — nenhuma tela fica num idioma diferente do resto.
+- **Bandeiras = SVG inline, NÃO emoji (2026‑07‑23):** o emoji de bandeira (🇧🇷) **quebra no Windows**
+  (Segoe UI Emoji não tem glyph de bandeira → mostra "BR"/"ES"); no Mac funciona, por isso passou. Trocado
+  por `<span class="flag flag--<code>">` com SVG data‑URI no CSS (`.flag--pt/en/es/fr/de/it`, keyed pelo
+  **código do idioma** — cuidado: a classe é por idioma `pt`/`en`, não por país `br`/`us`). Renderiza
+  idêntico em todo SO.
+- **Seletor (`LangMenu` em main.js):** **só bandeira** quando fechado + popover temático (bandeira +
+  nome nativo, atual em dourado) — um `<select>` nativo não mostra só o emoji de forma limpa. Fecha em
+  clique-fora/Esc. Fica na `.viewbar` (junto do switch de visão) no app; **na tela de login foi movido
+  para a MESMA LINHA do wordmark "To do"** (`.auth__brandlang`, `margin-left:auto`) — antes flutuava
+  isolado acima do título e no desktop passava da borda direita dos inputs (desalinhado).
+- **Categorias do inventário:** a API continua dona da LISTA (`key` + ícone Phosphor); o **rótulo é
+  traduzido no cliente** por `t("cat." + key)`. Adicionar idioma não exige mexer no servidor; adicionar
+  categoria no servidor sem traduzir **quebra um teste**.
+- **Botão do Google:** `renderButton` recebe `locale: lang()` — sem isso o GIS escolhe o próprio idioma
+  e o botão aparecia em **português numa tela em espanhol**.
+- **Armadilha corrigida no caminho:** `passwordStrength` (utils.js) devolvia texto de UI
+  ("min 8 chars") e a view montava `t("pw." + r)` → a chave `pw.min 8 chars` **não existia** e o usuário
+  veria a chave crua. Agora o util devolve **slugs** (`minChars`, `weak`, …) e a view traduz. Um teste
+  roda o `passwordStrength` de verdade e falha se algum slug ficar sem tradução.
+- **Adicionar idioma:** um código em `SUPPORTED`, uma entrada em `LANGS` e um dicionário. O
+  `test/i18n.test.js` reprova se faltar chave, sobrar chave, faltar `{placeholder}` ou se o app chamar
+  `t()` com chave inexistente.
+
+## Login com Google — BLOQUEADO num passo do operador (verificado ao vivo 2026‑07‑23)
+O código está completo e auditado (ver "Login com Google (GIS)" acima). O que falha é **configuração**,
+não implementação: reproduzido em browser headless, o console devolve
+**`[GSI_LOGGER]: The given origin is not allowed for the given client ID`**.
+- **Causa:** `https://todo.bobagi.space` não está em *Authorized JavaScript origins* do client
+  `956230576576-4r6ks4ek…` — que pertence ao **projeto GCP do CoinHub**, não ao `bobagi-apps-automation`.
+- **NÃO dá para automatizar:** o Google **não expõe API pública** para criar client OAuth nem para
+  editar origens autorizadas (só o IAP tem API, e é para clients de IAP). Confirmado também que a
+  service account `claude-play-publisher@bobagi-apps-automation` **não alcança** o projeto `956230576576`.
+  Não perca tempo procurando endpoint — não existe.
+- **O passo (≈2 min, só o operador):** console.cloud.google.com → projeto `956230576576` → APIs e
+  serviços → Credenciais → o client OAuth web → *Authorized JavaScript origins* → **adicionar
+  `https://todo.bobagi.space`** → Salvar (propaga em minutos). Alternativa mais limpa: criar um client
+  **dedicado ao todo** e trocar `GOOGLE_CLIENT_ID` no `.env` (é 1 env var + `deploy.sh`) — evita a tela
+  de consentimento mostrar o nome do projeto do CoinHub.
+- **Verificar depois:** `curl` não serve; use o browser. O erro some do console e o clique abre o popup.
+
 ## ⚠️ Segurança & bugs conhecidos (validação 2026‑07‑15) — LEIA antes de "ir pra produção"
 Ordenado por severidade. **Nada disto foi corrigido ainda** — foi só levantado.
 
@@ -148,8 +264,14 @@ Ordenado por severidade. **Nada disto foi corrigido ainda** — foi só levantad
 
 ## Pendências de git (working tree diverge do GitHub)
 - Local está **1 commit à frente** de `origin/main` (o commit `deploy.sh` não foi pushado).
+- **NÃO COMMITADO (2026‑07‑23):** toda a feature de inventário (`server/routes/inventory.js`,
+  `public/js/app/inventory.js`, `prisma/migrations/202607230001_inventory/`, `test/`, alterações em
+  `server.js`/`main.js`/`api.js`/`style.css`/`package.json`/`service-worker.js`), **mais** a i18n
+  (`public/js/app/i18n.js`, `test/i18n.test.js`, alterações em `about.js`/`store.js`/`utils.js`) —
+  **está tudo no ar** (imagem buildada, SW `v8`), mas fora do git.
 - `docker-compose.yml` tem **mudança não commitada**: o bind `127.0.0.1:${WEB_PORT}:3000`
-  (hardening de porta). **Commitar + pushar** para o GitHub não ficar sem o hardening.
+  (hardening de porta) + `restart: unless-stopped`. **Commitar + pushar** para o GitHub não ficar
+  sem o hardening.
 
 ## DECISÃO 2026‑07‑15: pivô para **peça de portfólio**
 O operador decidiu **desviar o app para portfólio** (não perseguir monetização por agora). Logo:
@@ -186,14 +308,18 @@ self-hosted** (`public/fonts/space-grotesk.woff2`, 22KB), sistema de **tokens em
 (`public/style.css` reescrito). Resolvidos todos os P1/P2 do review: header mobile não quebra mais o
 título, **hierarquia de botão** (`.btn--primary/ghost/danger` + `.iconbtn` — deletar deixou de gritar),
 idioma **EN**, **empty-state** desenhado, `alert/prompt/confirm` nativos → **toasts + modal temáticos**
-(`main.js` agora é class-based; corrida save-on-blur blindada com `onMouseDown preventDefault`), foco de
+(`main.js` é um componente de **função com hooks** — uma versão anterior deste arquivo dizia
+"class-based", o que nunca foi verdade; corrida save-on-blur blindada com `onMouseDown preventDefault`), foco de
 teclado, reduced-motion. Neon checkbox preservado 1:1 (gold re-tokenizado). Relatório+screenshots em
 `.claude/frontend-review/20260716-redesign/`. **SEAM conhecido:** a loja/upgrades (`store.js`) continua
 em **PT + estilo antigo** (superfície de billing congelada) — restilizar/traduzir ou esconder quando
 decidir o destino do Stripe. Tudo fora desse modal foi repaginado.
 
 ### Backlog de portfólio (o operador decide o que atacar)
-1. **`test-forge`**: 1 smoke test (auth + tabs/tasks) para o app "parecer sério".
+1. **`test-forge`**: FEITO para o inventário (15 testes). Falta cobrir **auth + tabs/tasks**.
+1b. **Bug pré-existente:** `tasks.js`/`tabs.js` abrem transação com `pool.query("BEGIN")` — no *pool*,
+   não num client dedicado, então os comandos podem cair em conexões diferentes e a transação não
+   vale. O código do inventário usa `pool.connect()` corretamente; alinhar os dois antigos.
 2. **`app-essentials`** se quiser subir o nível: reset de senha/verificação de e‑mail/exclusão de conta.
 3. **Loja/Stripe** congelado (não ativar) — quando decidir: restilizar `store.js` p/ o novo design (EN)
    ou remover a loja p/ uma demo limpa. **Google login:** FEITO (só falta o passo do operador no console).

@@ -30,7 +30,10 @@ export function validateUsername(u) {
  * - Requirements for OK bar:
  *   at least 3 of the 4 classes AND length >= 8
  * - Strong when ALL requirements are met (upper, lower, number, symbol, length>=8)
- * Returns: { ok, score, label, reasons[] }
+ * Returns: { ok, score, label, reasons[] } where `label` and `reasons` are
+ * STABLE SLUGS ("weak"/"minChars"/…), not display text — the view translates
+ * them via t("pw." + slug). Returning prose here silently produced keys like
+ * "pw.min 8 chars" that no dictionary has.
  * score 0..4 (used by the 3-segment meter in main.js)
  */
 export function passwordStrength(pw = "") {
@@ -42,7 +45,7 @@ export function passwordStrength(pw = "") {
   const hasSymbol = /[^A-Za-z0-9]/.test(s);
 
   const reasons = [];
-  if (len < 8) reasons.push("min 8 chars");
+  if (len < 8) reasons.push("minChars");
   if (!hasUpper) reasons.push("uppercase");
   if (!hasLower) reasons.push("lowercase");
   if (!hasNumber) reasons.push("number");
@@ -61,11 +64,12 @@ export function passwordStrength(pw = "") {
   const okPartial = len >= 8 && classes >= 3;
   const okFull = len >= 8 && hasUpper && hasLower && hasNumber && hasSymbol;
 
-  const label = okFull ? "Strong" : okPartial ? "OK" : "Weak";
+  const label = okFull ? "strong" : okPartial ? "ok" : "weak";
 
   return {
     ok: okFull,
     score, // 0..4 (main.js converte em 0..3 segmentos)
+    // label/reasons são slugs — traduza com t("pw." + slug)
     label,
     reasons,
   };

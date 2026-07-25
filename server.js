@@ -13,6 +13,7 @@ const { createAuthRoutes } = require("./server/routes/auth");
 const { createBillingRoutes } = require("./server/routes/billing");
 const { createTabsRoutes } = require("./server/routes/tabs");
 const { createTasksRoutes } = require("./server/routes/tasks");
+const { createInventoryRoutes } = require("./server/routes/inventory");
 const { stripeWebhookRouter } = require("./server/billing/webhook");
 
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -63,6 +64,7 @@ app.use("/api", createAuthRoutes({ pool, generateToken }));
 app.use("/api", createBillingRoutes({ auth, stripe }));
 app.use("/api", createTabsRoutes({ auth }));
 app.use("/api", createTasksRoutes({ auth }));
+app.use("/api", createInventoryRoutes({ auth }));
 
 // me
 app.get("/api/me", auth, async (req, res) => {
@@ -75,6 +77,21 @@ app.get("/api/me", auth, async (req, res) => {
 
 // SPA fallback
 app.get("/*", sendIndex);
+
+// Errors last: answer with a generic 500 instead of Express's default handler,
+// which serialises the stack trace into the response whenever NODE_ENV isn't
+// "production" (it isn't set here) — that would leak file paths and query text.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (res.headersSent) return;
+  // A malformed JSON body is the caller's mistake, not ours — express.json()
+  // throws a SyntaxError for it, which would otherwise be reported as a 500.
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({ error: "invalid JSON body" });
+  }
+  console.error(err);
+  res.status(500).json({ error: "internal error" });
+});
 
 async function start() {
   try {
@@ -104,4 +121,8 @@ async function start() {
   }
 }
 
-start();
+// Only boot when run as the entrypoint, so the test suite can require this file,
+// listen on an ephemeral port and exercise the real middleware stack.
+if (require.main === module) start();
+
+module.exports = { app, start };
