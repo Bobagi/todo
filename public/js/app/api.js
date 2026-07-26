@@ -1,6 +1,22 @@
 export const authHeaders = (token) =>
   token ? { Authorization: "Bearer " + token } : {};
 
+export async function forgotPassword(email, locale) {
+  return fetch("/api/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, locale }),
+  });
+}
+
+export async function resetPassword(token, password) {
+  return fetch("/api/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export async function fetchBillingConfig(token) {
   const r = await fetch("/api/billing/config", { headers: authHeaders(token) });
   return r.ok ? r.json() : null;

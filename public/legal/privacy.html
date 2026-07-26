@@ -6,12 +6,12 @@
     <title>Política de Privacidade — To do</title>
     <style>
       :root {
-        --gold: #f1c40f;
+        --gold: #f5c531;
         --bg: #0d0d0d;
       }
       body {
         background: var(--bg);
-        color: var(--gold);
+        color: #eee7d3;
         font-family: system-ui, "Segoe UI", Arial, sans-serif;
         margin: 0;
         padding: 24px;
@@ -24,6 +24,10 @@
       }
       h1 {
         margin: 0 0 8px;
+        color: var(--gold);
+      }
+      strong {
+        color: var(--gold);
       }
       p {
         margin: 10px 0;
@@ -32,14 +36,14 @@
         margin: 8px 0 0 18px;
       }
       a {
-        color: #ffd700;
+        color: #ffd95e;
       }
       small {
         opacity: 0.75;
       }
       hr {
         border: none;
-        border-top: 1px solid #f1c40f33;
+        border-top: 1px solid #f5c53133;
         margin: 16px 0;
       }
     </style>
@@ -47,75 +51,118 @@
   <body>
     <main class="doc">
       <h1>Política de Privacidade</h1>
-      <small>Versão 1.0 • Atualizado em 31/08/2025</small>
+      <small>Versão 2.0 • Atualizado em 26/07/2026</small>
       <hr />
 
       <p>
+        Esta política descreve como o aplicativo <strong>To do</strong>
+        (<a href="https://todo.bobagi.space">todo.bobagi.space</a>) trata dados
+        pessoais, em conformidade com a LGPD (Lei 13.709/2018).
+      </p>
+
+      <p>
         <strong>Controlador e contato.</strong> Projeto operado por pessoa
-        física (sem CNPJ). Contato:
-        <a href="mailto:gustavoperin067@gmail.com">gustavoperin067@gmail.com</a
-        >.
+        física (Gustavo Perin, sem CNPJ). Encarregado/contato:
+        <a href="mailto:gustavoperin067@gmail.com">gustavoperin067@gmail.com</a>.
+      </p>
+
+      <p><strong>Dados que tratamos.</strong></p>
+      <ul>
+        <li>
+          <strong>Conta:</strong> nome de usuário e <strong>e-mail</strong> (o
+          e-mail é obrigatório no cadastro por senha) e o <em>hash</em> da senha
+          (nunca guardamos a senha em texto puro). Se você entrar com Google,
+          recebemos do Google seu <strong>e-mail</strong> e um
+          <strong>identificador de conta</strong> (subject) — não recebemos sua
+          senha do Google.
+        </li>
+        <li>
+          <strong>Conteúdo que você cria:</strong> suas abas, tarefas e os itens
+          e locais do inventário.
+        </li>
+        <li>
+          <strong>Registros de acesso (segurança):</strong> a cada cadastro,
+          login e redefinição de senha guardamos <strong>endereço IP</strong>,
+          <strong>user-agent</strong> do navegador, o tipo de evento e a data/hora
+          — para proteger a conta contra acesso indevido.
+        </li>
+        <li>
+          <strong>Redefinição de senha:</strong> ao pedir "esqueci a senha",
+          geramos um token de uso único (guardamos apenas o <em>hash</em> dele) e
+          enviamos um link ao seu e-mail. O envio usa um servidor de e-mail
+          (SMTP) do próprio operador.
+        </li>
+        <li>
+          <strong>Pagamentos (se você comprar algo):</strong> o processamento é
+          feito pela Stripe; recebemos apenas metadados mínimos da transação —
+          <strong>não</strong> armazenamos dados completos de cartão. (No momento
+          a loja está desativada.)
+        </li>
+        <li>
+          <strong>Analytics:</strong> usamos <strong>Umami</strong>
+          (auto-hospedado em analytics.bobagi.space) para métricas agregadas de
+          uso. O Umami é <strong>sem cookies</strong> e <strong>não cria perfil
+          individual</strong> nem rastreia você entre sites; coleta dados
+          agregados (páginas, referências, tipo de dispositivo).
+        </li>
+        <li>
+          <strong>Armazenamento local:</strong> guardamos no seu navegador
+          (localStorage) o token de sessão e preferências (idioma, visão) — são
+          essenciais ao funcionamento, não são cookies de rastreamento.
+        </li>
+      </ul>
+
+      <p>
+        <strong>Finalidades.</strong> Fornecer e operar o app; autenticar e
+        proteger sua conta; enviar e-mails transacionais (redefinição de senha);
+        processar pagamentos, se houver; e entender o uso de forma agregada.
       </p>
 
       <p>
-        <strong>Dados tratados.</strong> (i) Conta: username e, quando
-        informado, e-mail. (ii) Autenticação: <em>hash</em> da senha (não
-        armazenamos a senha em texto puro). (iii) Uso do app: suas abas e
-        tarefas. (iv) Pagamentos: metadados mínimos retornados pelo provedor
-        (não armazenamos dados completos de cartão). (v) Cookies: apenas os
-        estritamente necessários ao funcionamento do app.
+        <strong>Bases legais.</strong> Execução de contrato (fornecer o app);
+        legítimo interesse (segurança/antiabuso proporcional, métricas
+        agregadas); cumprimento de obrigação legal quando aplicável.
       </p>
 
       <p>
-        <strong>Finalidades.</strong> Prestar o serviço e permitir o
-        gerenciamento de tarefas; processar pagamentos e combater fraude;
-        cumprir obrigações legais quando aplicável.
-      </p>
-
-      <p>
-        <strong>Bases legais.</strong> Execução de contrato (fornecimento do
-        app); legítimo interesse (segurança/antiabuso proporcional);
-        consentimento quando necessário (por exemplo, determinados cookies ou
-        integração Google se ativada).
-      </p>
-
-      <p>
-        <strong>Compartilhamento.</strong> Com provedores estritamente
-        necessários (ex.: hospedagem e pagamento), que tratam dados conforme
-        instruções e seus próprios termos.
+        <strong>Compartilhamento.</strong> Com operadores estritamente
+        necessários: <strong>Google</strong> (se você usa o login Google),
+        <strong>Stripe</strong> (se você paga), o provedor de e-mail (SMTP) para
+        entregar mensagens, e a hospedagem. Cada um trata os dados conforme suas
+        próprias políticas. Não vendemos seus dados.
       </p>
 
       <p>
         <strong>Retenção.</strong> Dados de conta e conteúdo: enquanto a conta
-        existir ou pelo tempo necessário para cumprir obrigações legais.
-        Registros de pagamento: conforme exigências do provedor e legislação
-        aplicável.
-        <strong>Não mantemos “registros de acesso à aplicação” próprios</strong>
-        neste momento; se isso mudar, atualizaremos esta política.
+        existir. Registros de acesso: mantidos por período limitado para fins de
+        segurança. Tokens de redefinição: expiram em 1 hora e são descartados
+        após o uso.
       </p>
 
       <p>
-        <strong>Segurança.</strong> Adotamos medidas razoáveis (como hash de
-        senha). Nenhuma medida é 100% infalível; em incidentes relevantes,
-        notificaremos os usuários afetados conforme exigido por lei.
+        <strong>Segurança.</strong> Senhas com <em>bcrypt</em>; tráfego sob TLS;
+        tokens guardados apenas como <em>hash</em>. Nenhuma medida é 100%
+        infalível; em incidentes relevantes, notificaremos conforme a lei.
       </p>
 
       <p>
-        <strong>Crianças e adolescentes.</strong> Uso geral recomendado a partir
-        de 13 anos. Não coletamos dados de crianças (&lt;12) sem consentimento
-        verificável do responsável.
+        <strong>Crianças e adolescentes.</strong> Uso recomendado a partir de 13
+        anos. Não coletamos intencionalmente dados de crianças sem consentimento
+        do responsável.
       </p>
 
       <p>
-        <strong>Seus direitos.</strong> Você pode solicitar acesso, correção ou
-        exclusão de dados pelo e-mail
-        <a href="mailto:gustavoperin067@gmail.com">gustavoperin067@gmail.com</a
-        >.
+        <strong>Seus direitos (LGPD).</strong> Você pode solicitar acesso,
+        correção, portabilidade e <strong>exclusão</strong> dos seus dados pelo
+        e-mail
+        <a href="mailto:gustavoperin067@gmail.com">gustavoperin067@gmail.com</a>.
+        Atenderemos os pedidos previstos no art. 18 da LGPD.
       </p>
 
       <p>
         <strong>Mudanças nesta política.</strong> Podemos atualizar este
-        documento; mudanças relevantes serão comunicadas dentro do app.
+        documento; ao mudar materialmente, a versão acima é incrementada e o
+        aceite pode ser solicitado novamente dentro do app.
       </p>
 
       <p><a href="/legal/terms.html">Termos de Uso</a></p>

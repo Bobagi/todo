@@ -72,9 +72,12 @@ deploy.sh                     # build + up -d + health check (one-command deploy
 - **Migrations:** rodam sozinhas no boot do container (entrypoint). Novo SQL → nova pasta
   `prisma/migrations/<ordem>_nome/migration.sql`.
 - **Stripe local:** `stripe listen --forward-to http://localhost:3051/api/billing/webhook`.
-- **Testes (desde 2026‑07‑23):** `docker compose run --rm --entrypoint npm web test` → `node --test`.
-  **23 testes** cobrindo o inventário e a i18n (IDOR entre contas, atomicidade dos limites sob concorrência,
-  clamps casados às colunas, idempotência do move + histórico). O harness (`test/helpers/harness.js`)
+- **Testes (desde 2026‑07‑23):** `docker compose run --rm --entrypoint npm web test` → `node --test
+  --test-concurrency=1` (serial: vários arquivos resetam o mesmo `todo_test`, não podem correr em paralelo).
+  **37 testes** — inventário, i18n, **auth/register+login** (`test/auth.test.js`) e **reset de senha**
+  (`test/reset.test.js`, desde 2026‑07‑26: forgot sempre 200/anti‑enumeração, token uso‑único/expira/só‑hash,
+  senha fraca não consome token, e **revogação de sessão** — JWT antigo morre após reset). O harness zera
+  `SMTP_*` p/ o e‑mail virar no‑op (nunca dispara e‑mail real nos testes). O harness (`test/helpers/harness.js`)
   **cria um banco descartável `todo_test`** (drop+create+replay das migrations) e sobe o app real numa
   porta efêmera — **nunca toca no banco de produção**. Para isso o `server.js` passou a exportar `app` e
   só chamar `start()` quando é o entrypoint (`require.main === module`).
@@ -101,14 +104,58 @@ deploy.sh                     # build + up -d + health check (one-command deploy
 - **Fluxo pago:** `/billing/checkout` cria uma Stripe Checkout Session; o **webhook**
   (`checkout.session.completed`) grava `payments` (idempotente por `payment_intent`) e o
   `entitlement`. Sucesso volta para `/?paid=1`.
-- **access_logs:** `register`/`login` são registrados com IP + user‑agent.
+- **access_logs:** `register`/`login`/`password_reset` são registrados com IP + user‑agent.
+
+## Reset de senha + e‑mail transacional (feito 2026‑07‑26, via app‑essentials + CoinHub de referência)
+Fluxo "esqueci a senha" completo, adaptado do CoinHub (Go) para Node/JWT.
+- **Tabela `auth_tokens`** (migration `202607260002_password_reset`): `(id,user_id,purpose,token_hash,
+  expires_at,used_at)` — guarda **só o SHA‑256** do token (o cru só vai no e‑mail); `purpose='password_reset'`
+  (serve também p/ verificação de e‑mail no futuro). Índice único no `token_hash`.
+- **`POST /forgot-password`** (`server/routes/auth.js`): **responde 200 IMEDIATAMENTE** e faz o trabalho num
+  IIFE async depois — senão o tempo de resposta enumeraria (a security‑sweep pegou 6× existente vs
+  inexistente). Só emite link se a conta existe **E tem senha** (Google‑only fica em silêncio). Token
+  `randomBytes(32)`, TTL 1h, uso‑único; emitir novo invalida os anteriores. Link = `APP_BASE_URL/?reset=<raw>`.
+- **`POST /reset-password`**: transação `SELECT … FOR UPDATE` no token (não usado/não expirado) → valida
+  senha forte → bcrypt → marca `used_at` → **bump `users.token_version`**.
+- **Revogação de sessão (JWT stateless):** `users.token_version` (migration acima) é embutido no JWT (`tv`) e
+  **re‑checado no guard `auth()` a cada request** (1 lookup de PK); o reset bumpa a versão → todo JWT antigo
+  dá 401 (linha ausente = user apagado = 401 também). `server/auth.js` agora é **async** e **hard‑fail** sem
+  `JWT_SECRET` forte (fim do fallback `|| "secret"` — fechou o P2 da sweep).
+- **E‑mail:** `server/email.js` (nodemailer, **config‑driven/no‑op** sem `SMTP_*`) + `server/email_templates.js`
+  (PT/EN). SMTP reusa o Gmail do CoinHub (`bobagi.contact@gmail.com`) — envs em `.env`: `SMTP_HOST/PORT/
+  USERNAME/PASSWORD`, `SMTP_FROM_NAME="To do"`, `APP_BASE_URL=https://todo.bobagi.space`.
+- **Front:** link "Esqueceu a senha?" no login → form de e‑mail (toast "se existir, link a caminho"); a URL
+  `?reset=<token>` abre o form "nova senha" (`public/js/app/main.js`, i18n nos 6 idiomas). SW **v15**.
+- **Qualidade:** `test/reset.test.js` (7 testes), security‑sweep (`.claude/security-sweep/20260726-reset/` —
+  1 P2 timing corrigido; token não‑adivinhável/só‑hash/sem SQLi/revogação provados ao vivo), headless UI OK.
+- ⚠️ **TODO OPERADOR — rotacionar o Gmail app password** `bobagi.contact@gmail.com` (vazou no chat numa
+  máscara mal feita; é compartilhado com o CoinHub → gerar novo em myaccount.google.com/apppasswords e
+  atualizar os dois `.env`).
+
+## Termos + Privacidade — v2.0 (reescritos 2026‑07‑26)
+`public/legal/{terms,privacy}.html` estavam desatualizados (a Privacidade dizia "não mantemos registros de
+acesso" — mas há `access_logs`; não citava o Umami). Reescritos alinhados ao que o app faz: conta+e‑mail
+obrigatório, hash de senha, conteúdo (abas/tarefas/inventário), `access_logs` (IP/UA)+retenção, dados do
+Google, **Umami cookieless**, tokens de reset, loja desativada, foro/CDC, direitos LGPD. Versão **v2.0**
+(`TOS_VERSION`/`PRIV_VERSION` = `"v2"` no `auth.js`, casada com a data das páginas). ⚠️ É template de
+engenharia — advogado deve revisar antes de cobrança real. Não há gate de re‑aceite (contas antigas seguem
+com v1 gravado; só o operador usa hoje).
+- **Cadastro por senha EXIGE e‑mail (desde 2026‑07‑26).** `/register` valida `email` (formato +
+  obrigatório, server‑side) e o grava; unicidade **case‑insensitive** (pré‑check `LOWER(email)` +
+  migration `202607260001_users_email_lower_unique` = índice único em `LOWER(email)`, espelhando o do
+  username). **Login continua por username** (e‑mail não é identificador de login). As 5 contas antigas
+  seguem com `email` NULL (grandfathered — múltiplos NULL são permitidos no índice). No front há um input
+  `type=email` **só no modo cadastro** (i18n nos 6 idiomas: `auth.email`/`auth.badEmail`). Isso destrava
+  reset/verificação de e‑mail no futuro (ainda **não** implementados). Travado por `test/auth.test.js`.
 
 ## Login com Google (GIS) — ATIVO desde 2026‑07‑16
 Fluxo **Google Identity Services** (botão + ID token), NÃO o code‑flow com secret/redirect do
 CoinHub — todo já tinha esse fluxo 90% pronto; só faltava um client id real e a injeção.
-- **Client id (público):** reusa o **web OAuth client do operador** (mesmo GCP do CoinHub,
-  `956230576576‑…apps.googleusercontent.com`). Fica em `GOOGLE_CLIENT_ID` no `.env` (git‑ignored).
-  Client id é público por design (aparece no browser) — não é segredo.
+- **Client id (público):** desde **2026‑07‑25** usa um **client OAuth DEDICADO ao todo**
+  (`1050584273275‑…apps.googleusercontent.com`, criado pelo operador) — não é mais o client do CoinHub.
+  Fica em `GOOGLE_CLIENT_ID` no `.env` (git‑ignored). Client id é público por design (aparece no browser)
+  — não é segredo. O **client secret** do fluxo GIS **não é usado** (só serviria no code‑flow); não guardar
+  no `.env`.
 - **Injeção:** `server.js` `sendIndex` injeta `%GOOGLE_CLIENT_ID%` no `index.html` (dentro de
   `window.__GOOGLE_CLIENT_ID__`), **validando o formato** antes (defense‑in‑depth). `static` roda
   com `index:false` p/ não furar a injeção. O front (`public/js/app/main.js`) faz
@@ -118,12 +165,22 @@ CoinHub — todo já tinha esse fluxo 90% pronto; só faltava um client id real 
   exige `email_verified`, e casa **só por `google_id`** (subject) — nunca auto‑link por e‑mail
   (anti‑takeover). Auditado pela `security-sweep` (relatório em
   `.claude/security-sweep/20260716-google-login/`): forja/injeção testadas ao vivo, 0 achado aberto.
-- **⚠️ PASSO MANUAL DO OPERADOR (obrigatório p/ o botão funcionar em prod):** adicionar
-  **`https://todo.bobagi.space`** em *Authorized JavaScript origins* do OAuth client no Google Cloud
-  Console (projeto `956230576576`). Até lá o **botão APARECE mas o clique falha** com "origin not
-  allowed" no console (login e‑mail/senha funciona normal). Consideração: a tela de consentimento mostrará o
-  nome do projeto CoinHub — se quiser separação, criar um client dedicado e trocar o `GOOGLE_CLIENT_ID`
-  (é 1 env var).
+- **✅ 2026‑07‑25 — origin/client resolvidos.** O operador criou o **client dedicado ao todo**
+  (`1050584273275‑…`) e adicionou `https://todo.bobagi.space` em *Authorized JavaScript origins* (redirect
+  vazio — GIS/ID token não usa redirect nem secret). Troquei o `GOOGLE_CLIENT_ID` no `.env` + `deploy.sh`.
+  Botão passou a renderizar sem `[GSI_LOGGER]: origin is not allowed`.
+- **🐛→✅ 2026‑07‑26 — bug de FRONT que travava o login inteiro (corrigido).** Depois da origin liberada, o
+  login "funcionava" (usuário escolhia a conta, backend criava a linha e devolvia 200 + token) mas a UI
+  **recarregava pro login** — e‑mail/senha entrava normal. Causa: `handleCredentialResponse` (main.js) fazia
+  `setToken(d.token)` **e chamava `fetchTabs()` na mesma função**; o `token` do closure ainda era o antigo
+  (null) → request sem `Authorization` → **401** → o catch de `fetchTabs` limpa a sessão
+  (`setToken(null)`+`localStorage.removeItem`) e **apagava o token recém‑salvo**. Fix: **removida a chamada
+  direta** `fetchTabs()` — o `useEffect([token])` já recarrega abas/billing com o token novo (mesmo caminho
+  do login e‑mail/senha). SW bumpado **v12→v13** (o browser servia a página cacheada com o id velho → `aud`
+  não batia → falha fantasma). Backend confirmado OK durante o debug (token real: `aud` bate, `email_verified`,
+  não expira; usuário criado no banco). Verificado headless: token válido no `localStorage` → app entra e
+  **permanece** logado. Falta só o operador clicar e concluir um login real (OAuth logado não é automatizável).
+  Lição registrada na skill `app-essentials` (seção 3 + Learnings log 2026‑07‑26).
 
 ## Inventário — "o que está em qual casa" (feito 2026‑07‑23)
 Segunda metade do app, atrás do switch **Tasks ⟷ Inventory** no topo (a visão escolhida persiste em
@@ -211,22 +268,25 @@ inventar CJK/RTL sem revisão). Adicionar idioma = 1 código em `SUPPORTED` + 1 
   `test/i18n.test.js` reprova se faltar chave, sobrar chave, faltar `{placeholder}` ou se o app chamar
   `t()` com chave inexistente.
 
-## Login com Google — BLOQUEADO num passo do operador (verificado ao vivo 2026‑07‑23)
-O código está completo e auditado (ver "Login com Google (GIS)" acima). O que falha é **configuração**,
-não implementação: reproduzido em browser headless, o console devolve
-**`[GSI_LOGGER]: The given origin is not allowed for the given client ID`**.
-- **Causa:** `https://todo.bobagi.space` não está em *Authorized JavaScript origins* do client
-  `956230576576-4r6ks4ek…` — que pertence ao **projeto GCP do CoinHub**, não ao `bobagi-apps-automation`.
-- **NÃO dá para automatizar:** o Google **não expõe API pública** para criar client OAuth nem para
-  editar origens autorizadas (só o IAP tem API, e é para clients de IAP). Confirmado também que a
-  service account `claude-play-publisher@bobagi-apps-automation` **não alcança** o projeto `956230576576`.
-  Não perca tempo procurando endpoint — não existe.
-- **O passo (≈2 min, só o operador):** console.cloud.google.com → projeto `956230576576` → APIs e
-  serviços → Credenciais → o client OAuth web → *Authorized JavaScript origins* → **adicionar
-  `https://todo.bobagi.space`** → Salvar (propaga em minutos). Alternativa mais limpa: criar um client
-  **dedicado ao todo** e trocar `GOOGLE_CLIENT_ID` no `.env` (é 1 env var + `deploy.sh`) — evita a tela
-  de consentimento mostrar o nome do projeto do CoinHub.
-- **Verificar depois:** `curl` não serve; use o browser. O erro some do console e o clique abre o popup.
+## Login com Google — RESOLVIDO (config em 2026‑07‑25 + bug de front em 2026‑07‑26)
+Foram **DOIS** problemas em sequência:
+**(1) Config (2026‑07‑25):** em headless o console dava
+`[GSI_LOGGER]: The given origin is not allowed for the given client ID`, porque o client em uso
+(`956230576576‑…`, do **projeto do CoinHub**) não tinha `https://todo.bobagi.space` nas *Authorized
+JavaScript origins*. **Resolvido:** o operador criou um **client OAuth dedicado ao todo**
+(`1050584273275‑…apps.googleusercontent.com`) com a JavaScript origin (redirect vazio — GIS/ID token não usa
+redirect nem secret); troquei o `GOOGLE_CLIENT_ID` no `.env` + `deploy.sh`. (O Google **não tem API** p/
+criar client nem editar origens — é passo manual do operador, não perca tempo procurando endpoint.)
+**(2) Bug de FRONT (2026‑07‑26):** com a origin liberada, o backend passou a criar o usuário e devolver
+200 + token, mas a UI **voltava pro login**. Causa: `handleCredentialResponse` (`public/js/app/main.js`)
+chamava `fetchTabs()` logo após `setToken(d.token)` — o `token` do closure ainda era null → request sem
+`Authorization` → 401 → o catch de `fetchTabs` limpava a sessão e **apagava o token recém‑salvo**. **Fix:**
+removida a chamada direta; o `useEffect([token])` carrega os dados com o token novo (igual e‑mail/senha).
+SW bumpado **v13** (cache servia página com id velho). Diagnóstico ficou fácil porque o `catch {}` do
+`/google-login` engolia o erro — agora loga `err.message`. **Como verificar:** `/api/google-login` responde
+400 a token forjado; `node <scratchpad>/gis-check.js` confirma o botão sem erro de origin; um JWT válido no
+`localStorage` faz o app entrar e permanecer logado (headless). Só o clique real do operador não é
+automatizável. Lição durável na skill `app-essentials` (seção 3 + Learnings log 2026‑07‑26).
 
 ## ⚠️ Segurança & bugs conhecidos (validação 2026‑07‑15) — LEIA antes de "ir pra produção"
 Ordenado por severidade. **Nada disto foi corrigido ainda** — foi só levantado.
@@ -245,8 +305,11 @@ Ordenado por severidade. **Nada disto foi corrigido ainda** — foi só levantad
    unpkg (`@phosphor-icons/web` resolve para *latest*; React 18 idem). Comprometer o CDN =
    XSS/account‑takeover em todo load. Fixar versão + SRI, ou self‑host, e adicionar CSP.
 5. **MÉDIO — sem rate‑limit / lockout em `/login`.** Brute‑force aberto (só bcrypt cost 10).
-   `/register` revela "user exists" (enumeração); o caminho "usuário inexistente" no login
-   não é constant‑time (enumeração por timing). Adicionar rate‑limit + resposta uniforme.
+   `/register` ainda revela "user exists"/"email already in use" (enumeração por mensagem — congelado
+   por ser portfólio). ✅ **Timing do login CORRIGIDO (2026‑07‑26):** era ~25× mais rápido p/ usuário
+   inexistente (o `||` pulava o bcrypt) → agora roda sempre 1 `bcrypt.compare` contra `DECOY_HASH`
+   quando falta user/senha (ratio 1,0× provado no sweep — `.claude/security-sweep/20260726-auth/`).
+   Ainda falta rate‑limit + resposta genérica única no register.
 6. **MÉDIO — IDOR de escrita em `PUT /api/tasks/:id`.** O `tab_id` novo não é validado como
    pertencente ao usuário (`SET tab_id=COALESCE($3,tab_id) WHERE id=$4 AND user_id=$5`) —
    dá pra mover tarefa para `tab_id` arbitrário e **furar o limite por aba**. Validar posse
@@ -254,13 +317,14 @@ Ordenado por severidade. **Nada disto foi corrigido ainda** — foi só levantad
 7. **BAIXO — TOCTOU no caminho pago.** Checagem de limite (`SELECT count` → `INSERT`) sem
    transação/lock em `tasks.js`/`tabs.js`: requests concorrentes furam o limite. Mesmo padrão
    da race financeira que já mordeu outro serviço deste box.
-8. **BAIXO — `JWT_SECRET` com fallback `"secret"`** em `auth.js` (`|| "secret"`). Prod tem
-   segredo real, mas se o env falhar, tokens ficam forjáveis. Deve **hard‑fail** sem env.
-9. **BAIXO — JWT em `localStorage`** (exfiltrável por XSS; sem revogação/refresh).
-10. **LACUNA de produto/LGPD — sem ciclo de conta.** Cadastro é só usuário+senha (**e‑mail
-    fica NULL**), então **não há como fazer reset de senha** (sem e‑mail no cadastro), nem
-    verificação de e‑mail, nem **exclusão de conta (hard‑delete exigido por LGPD)**, nem
-    logout server‑side. `app-essentials` cobre exatamente isso.
+8. ✅ **RESOLVIDO (2026‑07‑26) — `JWT_SECRET` fallback `"secret"`.** `auth.js` agora **hard‑fail** no boot
+   se o `JWT_SECRET` faltar/for fraco (removido o `|| "secret"`). Tokens não ficam mais forjáveis se o env
+   falhar.
+9. **BAIXO — JWT em `localStorage`** (exfiltrável por XSS). ✅ **Revogação adicionada (2026‑07‑26)** via
+   `token_version` (reset invalida todos os JWTs); ainda sem refresh‑token rotation.
+10. **LACUNA de produto/LGPD — ciclo de conta quase completo.** ✅ Cadastro exige e‑mail; ✅ **reset de senha
+    FEITO (2026‑07‑26)**; ✅ termos/privacidade v2 alinhados. Ainda **faltam**: verificação de e‑mail,
+    **exclusão de conta (hard‑delete LGPD)** e logout server‑side global. `app-essentials` cobre esses.
 
 ## Pendências de git (working tree diverge do GitHub)
 - Local está **1 commit à frente** de `origin/main` (o commit `deploy.sh` não foi pushado).

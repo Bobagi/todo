@@ -11,6 +11,13 @@ const { Client } = require("pg");
 const TEST_DB = process.env.TEST_DB || "todo_test";
 process.env.POSTGRES_DB = TEST_DB;
 
+// Force transactional email to the no-op sender in tests: set (not delete) the SMTP vars to empty
+// BEFORE server/email.js is required — dotenv won't override an already-set key, so this wins over
+// .env and no real email is ever sent while testing the reset flow.
+process.env.SMTP_HOST = "";
+process.env.SMTP_USERNAME = "";
+process.env.SMTP_PASSWORD = "";
+
 const ROOT = path.join(__dirname, "..", "..");
 
 function adminClient(database) {
@@ -68,7 +75,14 @@ async function newUser(url, prefix = "u") {
   const res = await fetch(`${url}/api/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password: "Aa1!aaaa", acceptLegal: true }),
+    body: JSON.stringify({
+      username,
+      // email is required on signup now; a unique per-user address keeps the
+      // unique(email) constraint happy across many newUser() calls.
+      email: `${username}@example.com`,
+      password: "Aa1!aaaa",
+      acceptLegal: true,
+    }),
   });
   const body = await res.json();
   if (!body.token) throw new Error(`register failed: ${JSON.stringify(body)}`);

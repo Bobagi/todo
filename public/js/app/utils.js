@@ -25,6 +25,13 @@ export function validateUsername(u) {
   return /^[A-Za-z0-9_]{3,30}$/.test(u || "");
 }
 
+// Pragmatic email check (client-side hint; the server re-validates as the real gate).
+// Non-space local part + @ + domain with a dot, and a sane length cap.
+export function validateEmail(m) {
+  const s = String(m || "").trim();
+  return s.length >= 3 && s.length <= 255 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 /**
  * Password strength:
  * - Requirements for OK bar:

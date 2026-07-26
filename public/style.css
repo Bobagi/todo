@@ -1110,3 +1110,25 @@ input[type="checkbox"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Password recovery — "Forgot password?" text link + the forgot-form hint. */
+.auth__forgot {
+  align-self: flex-end;
+  margin: -6px 2px 2px;
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth__forgot:hover { color: var(--gold-bright); }
+.auth__hint {
+  margin: -4px 2px 8px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}

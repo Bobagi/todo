@@ -13,6 +13,8 @@ import {
   fetchBillingConfig,
   reorderTabs,
   reorderTasks,
+  forgotPassword,
+  resetPassword,
 } from "./api.js";
 import { useDragTabs } from "./dragTabs.js";
 import { useDragTasks } from "./dragTasks.js";
@@ -26,6 +28,7 @@ import {
   passwordStrength,
   TAB_NAME_MAX,
   validateUsername,
+  validateEmail,
 } from "./utils.js";
 
 const GOOGLE_ON = !!(
@@ -109,11 +112,14 @@ function App() {
   const [selectedTabId, setSelectedTabId] = React.useState(null);
   const [title, setTitle] = React.useState("");
   const [username, setUsername] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [token, setToken] = React.useState(localStorage.getItem("token"));
   const [isRegister, setIsRegister] = React.useState(false);
   const [acceptLegal, setAcceptLegal] = React.useState(false);
+  const [forgotMode, setForgotMode] = React.useState(false);
+  const [resetToken, setResetToken] = React.useState(null);
   const [editingTaskId, setEditingTaskId] = React.useState(null);
   const [editingTitle, setEditingTitle] = React.useState("");
 
@@ -396,6 +402,10 @@ function App() {
         toast(t("auth.badUsername"), "error");
         return;
       }
+      if (!validateEmail(email)) {
+        toast(t("auth.badEmail"), "error");
+        return;
+      }
       const s = passwordStrength(password);
       if (!s.ok) {
         toast(t("auth.badPassword"), "error");
@@ -412,7 +422,7 @@ function App() {
     }
 
     const body = isRegister
-      ? { username, password, acceptLegal: true }
+      ? { username, email, password, acceptLegal: true }
       : { username, password };
 
     const r = await fetch(endpoint, {
@@ -425,10 +435,56 @@ function App() {
       localStorage.setItem("token", d.token);
       setToken(d.token);
       setUsername("");
+      setEmail("");
       setPassword("");
       setConfirmPassword("");
       setAcceptLegal(false);
     } else toast(d.error || t("common.oops"), "error");
+  }
+
+  // A reset link (emailed as ?reset=<token>) opens the "choose a new password" view.
+  React.useEffect(() => {
+    const rt = new URL(window.location.href).searchParams.get("reset");
+    if (rt) setResetToken(rt);
+  }, []);
+
+  function clearResetQuery() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("reset");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }
+
+  async function handleForgot() {
+    if (!validateEmail(email)) {
+      toast(t("auth.badEmail"), "error");
+      return;
+    }
+    // Always the same outcome regardless of whether the email exists (anti-enumeration).
+    await forgotPassword(email, lang()).catch(() => {});
+    toast(t("auth.resetSent"));
+    setForgotMode(false);
+    setEmail("");
+  }
+
+  async function handleReset() {
+    if (!passwordStrength(password).ok) {
+      toast(t("auth.badPassword"), "error");
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast(t("auth.mismatch"), "error");
+      return;
+    }
+    const r = await resetPassword(resetToken, password);
+    if (r.ok) {
+      toast(t("auth.resetOk"));
+      setResetToken(null);
+      clearResetQuery();
+      setPassword("");
+      setConfirmPassword("");
+    } else {
+      toast(t("auth.resetBadToken"), "error");
+    }
   }
 
   const handleCredentialResponse = async (response) => {
@@ -441,7 +497,10 @@ function App() {
     if (r.ok) {
       localStorage.setItem("token", d.token);
       setToken(d.token);
-      fetchTabs();
+      // NÃO chamar fetchTabs() aqui: o `token` do closure ainda é o antigo (null),
+      // então a chamada iria sem Authorization → 401 → o catch de fetchTabs limpa o
+      // token recém-salvo e volta pro login. O useEffect([token]) já recarrega abas/
+      // billing com o token novo (mesmo caminho do login por e-mail/senha).
     } else toast(d.error || t("auth.googleFailed"), "error");
   };
 
@@ -560,6 +619,112 @@ function App() {
 
   // ================= AUTH =================
   if (!token) {
+    const brandHeader = e(
+      "div",
+      { className: "auth__brand" },
+      e("i", { className: "ph-bold ph-check-circle mark" }),
+      e("span", { className: "auth__wordmark" }, "To do"),
+      e("div", { className: "auth__brandlang" }, langPicker)
+    );
+
+    // Choose-a-new-password view (arrived via the emailed reset link).
+    if (resetToken) {
+      return e(
+        React.Fragment,
+        null,
+        e(
+          "div",
+          { className: "authwrap" },
+          brandHeader,
+          e("h2", { className: "auth__title" }, t("auth.resetTitle")),
+          e("input", {
+            type: "password",
+            maxLength: 72,
+            placeholder: t("auth.newPassword"),
+            autoComplete: "new-password",
+            value: password,
+            onChange: (ev) => setPassword(ev.target.value),
+            onKeyDown: (ev) => {
+              if (ev.key === "Enter") handleReset();
+            },
+            className: "auth-input",
+          }),
+          e(
+            "div",
+            { className: "pw-meter" },
+            e("span", { className: segCount >= 1 ? "on" : "" }),
+            e("span", { className: segCount >= 2 ? "on" : "" }),
+            e("span", { className: segCount >= 3 ? "on" : "" })
+          ),
+          e("input", {
+            type: "password",
+            placeholder: t("auth.confirmPassword"),
+            value: confirmPassword,
+            onChange: (ev) => setConfirmPassword(ev.target.value),
+            onKeyDown: (ev) => {
+              if (ev.key === "Enter") handleReset();
+            },
+            className: "auth-input",
+          }),
+          e(
+            "button",
+            { onClick: handleReset, className: "btn btn--primary" },
+            t("auth.resetBtn")
+          ),
+          e(
+            "button",
+            {
+              onClick: () => {
+                setResetToken(null);
+                clearResetQuery();
+              },
+              className: "btn btn--ghost",
+            },
+            t("auth.backToLogin")
+          )
+        ),
+        overlays
+      );
+    }
+
+    // Request-a-reset-link view.
+    if (forgotMode) {
+      return e(
+        React.Fragment,
+        null,
+        e(
+          "div",
+          { className: "authwrap" },
+          brandHeader,
+          e("h2", { className: "auth__title" }, t("auth.forgotTitle")),
+          e("p", { className: "auth__hint" }, t("auth.forgotHint")),
+          e("input", {
+            type: "email",
+            maxLength: 255,
+            placeholder: t("auth.email"),
+            autoComplete: "email",
+            value: email,
+            onChange: (ev) => setEmail(ev.target.value),
+            onKeyDown: (ev) => {
+              if (ev.key === "Enter") handleForgot();
+            },
+            className: "auth-input",
+          }),
+          e(
+            "button",
+            { onClick: handleForgot, className: "btn btn--primary" },
+            t("auth.sendResetLink")
+          ),
+          e(
+            "button",
+            { onClick: () => setForgotMode(false), className: "btn btn--ghost" },
+            t("auth.backToLogin")
+          )
+        ),
+        overlays
+      );
+    }
+
     return e(
       React.Fragment,
       null,
@@ -599,6 +764,19 @@ function App() {
           },
           className: "auth-input",
         }),
+        isRegister &&
+          e("input", {
+            type: "email",
+            placeholder: t("auth.email"),
+            maxLength: 255,
+            value: email,
+            autoComplete: "email",
+            onChange: (ev) => setEmail(ev.target.value),
+            onKeyDown: (ev) => {
+              if (ev.key === "Enter") handleAuth();
+            },
+            className: "auth-input",
+          }),
         e("input", {
           type: "password",
           maxLength: 72,
@@ -611,6 +789,16 @@ function App() {
           },
           className: "auth-input",
         }),
+        !isRegister &&
+          e(
+            "button",
+            {
+              type: "button",
+              className: "auth__forgot",
+              onClick: () => setForgotMode(true),
+            },
+            t("auth.forgot")
+          ),
         isRegister &&
           e(
             "div",
