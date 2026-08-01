@@ -1,5 +1,5 @@
 -- Password reset (and future email verification): one-time tokens, only the SHA-256 HASH is stored
--- (the raw token is emailed). Mirrors the CoinHub auth_tokens design.
+-- (the raw token is emailed). Mirrors the Porkfolio auth_tokens design.
 CREATE TABLE IF NOT EXISTS auth_tokens (
     id          BIGSERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

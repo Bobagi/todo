@@ -197,7 +197,7 @@ function createAuthRoutes({ pool, generateToken }) {
   // "Esqueci a senha" — SEMPRE responde 200 (nunca revela se o e-mail existe: anti-enumeração).
   // Só envia link se a conta existe E tem senha (uma conta Google-only não tem o que resetar; ficar
   // em silêncio evita vazar o método de login). Token aleatório; guarda só o hash; invalida os
-  // anteriores. Padrão do CoinHub (RequestPasswordReset).
+  // anteriores. Padrão do Porkfolio (RequestPasswordReset).
   router.post("/forgot-password", async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
     const locale = RESET_LOCALES.has(req.body?.locale) ? req.body.locale : "en";

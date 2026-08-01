@@ -1,5 +1,5 @@
 // Transactional email — config-driven and NO-OP when SMTP is not configured, so the app boots and
-// runs without email (password-reset just doesn't deliver). Mirrors the CoinHub Sender pattern.
+// runs without email (password-reset just doesn't deliver). Mirrors the Porkfolio Sender pattern.
 // Never log the token or the message body.
 const nodemailer = require("nodemailer");
 

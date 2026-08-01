@@ -106,8 +106,8 @@ deploy.sh                     # build + up -d + health check (one-command deploy
   `entitlement`. Sucesso volta para `/?paid=1`.
 - **access_logs:** `register`/`login`/`password_reset` são registrados com IP + user‑agent.
 
-## Reset de senha + e‑mail transacional (feito 2026‑07‑26, via app‑essentials + CoinHub de referência)
-Fluxo "esqueci a senha" completo, adaptado do CoinHub (Go) para Node/JWT.
+## Reset de senha + e‑mail transacional (feito 2026‑07‑26, via app‑essentials + Porkfolio de referência)
+Fluxo "esqueci a senha" completo, adaptado do Porkfolio (Go) para Node/JWT.
 - **Tabela `auth_tokens`** (migration `202607260002_password_reset`): `(id,user_id,purpose,token_hash,
   expires_at,used_at)` — guarda **só o SHA‑256** do token (o cru só vai no e‑mail); `purpose='password_reset'`
   (serve também p/ verificação de e‑mail no futuro). Índice único no `token_hash`.
@@ -122,14 +122,14 @@ Fluxo "esqueci a senha" completo, adaptado do CoinHub (Go) para Node/JWT.
   dá 401 (linha ausente = user apagado = 401 também). `server/auth.js` agora é **async** e **hard‑fail** sem
   `JWT_SECRET` forte (fim do fallback `|| "secret"` — fechou o P2 da sweep).
 - **E‑mail:** `server/email.js` (nodemailer, **config‑driven/no‑op** sem `SMTP_*`) + `server/email_templates.js`
-  (PT/EN). SMTP reusa o Gmail do CoinHub (`bobagi.contact@gmail.com`) — envs em `.env`: `SMTP_HOST/PORT/
+  (PT/EN). SMTP reusa o Gmail do Porkfolio (`bobagi.contact@gmail.com`) — envs em `.env`: `SMTP_HOST/PORT/
   USERNAME/PASSWORD`, `SMTP_FROM_NAME="To do"`, `APP_BASE_URL=https://todo.bobagi.space`.
 - **Front:** link "Esqueceu a senha?" no login → form de e‑mail (toast "se existir, link a caminho"); a URL
   `?reset=<token>` abre o form "nova senha" (`public/js/app/main.js`, i18n nos 6 idiomas). SW **v15**.
 - **Qualidade:** `test/reset.test.js` (7 testes), security‑sweep (`.claude/security-sweep/20260726-reset/` —
   1 P2 timing corrigido; token não‑adivinhável/só‑hash/sem SQLi/revogação provados ao vivo), headless UI OK.
 - ⚠️ **TODO OPERADOR — rotacionar o Gmail app password** `bobagi.contact@gmail.com` (vazou no chat numa
-  máscara mal feita; é compartilhado com o CoinHub → gerar novo em myaccount.google.com/apppasswords e
+  máscara mal feita; é compartilhado com o Porkfolio → gerar novo em myaccount.google.com/apppasswords e
   atualizar os dois `.env`).
 
 ## Termos + Privacidade — v2.0 (reescritos 2026‑07‑26)
@@ -150,9 +150,9 @@ com v1 gravado; só o operador usa hoje).
 
 ## Login com Google (GIS) — ATIVO desde 2026‑07‑16
 Fluxo **Google Identity Services** (botão + ID token), NÃO o code‑flow com secret/redirect do
-CoinHub — todo já tinha esse fluxo 90% pronto; só faltava um client id real e a injeção.
+Porkfolio — todo já tinha esse fluxo 90% pronto; só faltava um client id real e a injeção.
 - **Client id (público):** desde **2026‑07‑25** usa um **client OAuth DEDICADO ao todo**
-  (`1050584273275‑…apps.googleusercontent.com`, criado pelo operador) — não é mais o client do CoinHub.
+  (`1050584273275‑…apps.googleusercontent.com`, criado pelo operador) — não é mais o client do Porkfolio.
   Fica em `GOOGLE_CLIENT_ID` no `.env` (git‑ignored). Client id é público por design (aparece no browser)
   — não é segredo. O **client secret** do fluxo GIS **não é usado** (só serviria no code‑flow); não guardar
   no `.env`.
@@ -272,7 +272,7 @@ inventar CJK/RTL sem revisão). Adicionar idioma = 1 código em `SUPPORTED` + 1 
 Foram **DOIS** problemas em sequência:
 **(1) Config (2026‑07‑25):** em headless o console dava
 `[GSI_LOGGER]: The given origin is not allowed for the given client ID`, porque o client em uso
-(`956230576576‑…`, do **projeto do CoinHub**) não tinha `https://todo.bobagi.space` nas *Authorized
+(`956230576576‑…`, do **projeto do Porkfolio**) não tinha `https://todo.bobagi.space` nas *Authorized
 JavaScript origins*. **Resolvido:** o operador criou um **client OAuth dedicado ao todo**
 (`1050584273275‑…apps.googleusercontent.com`) com a JavaScript origin (redirect vazio — GIS/ID token não usa
 redirect nem secret); troquei o `GOOGLE_CLIENT_ID` no `.env` + `deploy.sh`. (O Google **não tem API** p/
